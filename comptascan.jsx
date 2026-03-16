@@ -768,6 +768,9 @@ function matchFournisseurFEC(nomFacture, fecData) {
 }
 
 // ─── AI ───
+import { auth, PROXY_URL } from "./firebase.js";
+import { signOut } from "firebase/auth";
+
 async function extractInvoiceData(images, planComptable, entityType, fecData) {
   const config = ENTITY_CONFIG[entityType];
   const planSummary = planComptable.map((c) => `${c.compte} - ${c.libelle} (${c.type})`).join("\n");
@@ -781,17 +784,25 @@ async function extractInvoiceData(images, planComptable, entityType, fecData) {
     ? `C'est la comptabilité d'une ASSOCIATION loi 1901. Utilise la terminologie associative (emplois/ressources, excédent/déficit).`
     : `C'est la comptabilité d'une ENTREPRISE commerciale. Terminologie classique (charges/produits, bénéfice/perte).`;
 
-  // Préparer le contexte FEC si disponible
   const fecContext = fecData && fecData.length > 0
     ? `\nFOURNISSEURS DÉJÀ COMPTABILISÉS (extrait du FEC) :\n${fecData.slice(0, 30).map(f => `- "${f.nomOriginal}" → compte charge: ${f.compteCharge || "?"}, compte aux: ${f.compteAux || "?"}`).join("\n")}\n\nSi le fournisseur de la facture correspond à un fournisseur du FEC, utilise IMPÉRATIVEMENT son compte_charge déjà utilisé.`
     : "";
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  // Récupérer le token Firebase Auth
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Utilisateur non connecté");
+  const token = await currentUser.getIdToken();
+
+  const response = await fetch(PROXY_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+    },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1000,
+      tool: "comptascan",
       messages: [{
         role: "user",
         content: [
@@ -833,17 +844,38 @@ Si le fournisseur est reconnu dans le FEC, mets fec_match à true. Utilise les c
     }),
   });
 
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || `Erreur proxy (${response.status})`);
+  }
+
   const data = await response.json();
   const text = data.content.filter((b) => b.type === "text").map((b) => b.text).join("");
   return JSON.parse(text.replace(/```json|```/g, "").trim());
+}
+
+// ─── VÉRIFICATION D'ÉQUILIBRE ───
+function verifierEquilibre(lignes) {
+  const totalDebit = lignes.reduce((s, l) => s + (l.debit || 0), 0);
+  const totalCredit = lignes.reduce((s, l) => s + (l.credit || 0), 0);
+  const ecart = Math.round((totalDebit - totalCredit) * 100) / 100;
+  if (Math.abs(ecart) < 0.01) return { equilibre: true, ecart: 0, lignes };
+  // Correction automatique : ajustement sur la dernière ligne de charge (débit)
+  const lignesCorrigees = [...lignes];
+  const idxCharge = lignesCorrigees.findIndex(l => l.debit > 0);
+  if (idxCharge >= 0) {
+    lignesCorrigees[idxCharge] = {
+      ...lignesCorrigees[idxCharge],
+      debit: Math.round((lignesCorrigees[idxCharge].debit - ecart) * 100) / 100,
+    };
+  }
+  return { equilibre: false, ecart, lignes: lignesCorrigees };
 }
 
 function genererEcritures(factures, planComptable, entityType, fecData) {
   const config = ENTITY_CONFIG[entityType];
   return factures.map((f, idx) => {
     const piece = f.numero_facture || `FAC-${String(idx + 1).padStart(4, "0")}`;
-
-    // Vérifier si on a un match FEC pour ce fournisseur
     const fecMatch = matchFournisseurFEC(f.fournisseur, fecData);
     const compteCharge = (fecMatch?.compteCharge) || f.compte_charge || "607000";
     const libelleCharge = planComptable.find((c) => c.compte === compteCharge)?.libelle || "Achat";
@@ -851,21 +883,39 @@ function genererEcritures(factures, planComptable, entityType, fecData) {
     const lignes = [{
       compte: compteCharge,
       libelle: `${f.fournisseur} - ${f.description || libelleCharge}`,
-      debit: config.tvaApplicable ? f.montant_ht : f.montant_ttc,
+      debit: Math.round((config.tvaApplicable ? f.montant_ht : f.montant_ttc) * 100) / 100,
       credit: 0,
     }];
     if (config.tvaApplicable && f.tva > 0) {
-      lignes.push({ compte: config.compteTVA, libelle: `TVA déductible ${f.taux_tva || 20}% - ${f.fournisseur}`, debit: f.tva, credit: 0 });
+      lignes.push({
+        compte: config.compteTVA,
+        libelle: `TVA déductible ${f.taux_tva || 20}% - ${f.fournisseur}`,
+        debit: Math.round(f.tva * 100) / 100,
+        credit: 0,
+      });
     }
-    lignes.push({ compte: config.compteFournisseur, libelle: `${f.fournisseur} - Facture ${piece}`, debit: 0, credit: f.montant_ttc });
+    lignes.push({
+      compte: config.compteFournisseur,
+      libelle: `${f.fournisseur} - Facture ${piece}`,
+      debit: 0,
+      credit: Math.round(f.montant_ttc * 100) / 100,
+    });
+
+    const { equilibre, ecart, lignes: lignesFinales } = verifierEquilibre(lignes);
 
     return {
       id: crypto.randomUUID(),
       date: f.date || new Date().toISOString().split("T")[0],
-      piece, fournisseur: f.fournisseur, montantTTC: f.montant_ttc,
-      journal: config.defaultJournal, lignes, status: "validée", entityType,
+      piece, fournisseur: f.fournisseur,
+      montantTTC: Math.round(f.montant_ttc * 100) / 100,
+      journal: config.defaultJournal,
+      lignes: lignesFinales,
+      status: "validée",
+      entityType,
       fecMatch: !!fecMatch,
       fecMatchNom: fecMatch?.nomOriginal,
+      equilibre,
+      ecartAvantCorrection: ecart,
     };
   });
 }
@@ -1080,19 +1130,73 @@ function CameraView({ onCapture, onClose }) {
 function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState("Analyse en cours...");
   const [error, setError] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
 
-  const handleFiles = useCallback((files) => {
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith("image/")) return;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImages((prev) => [...prev, { id: crypto.randomUUID(), name: file.name, data: e.target.result.split(",")[1], type: file.type, preview: e.target.result }]);
-      };
-      reader.readAsDataURL(file);
-    });
+  const convertPdfToImages = async (file) => {
+    // Chargement dynamique de pdfjs depuis CDN
+    if (!window.pdfjsLib) {
+      await new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
+    const pdfjsLib = window.pdfjsLib;
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pageImages = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 2.0 });
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+      pageImages.push({
+        id: crypto.randomUUID(),
+        name: `${file.name}_page${i}.jpg`,
+        data: dataUrl.split(",")[1],
+        type: "image/jpeg",
+        preview: dataUrl,
+        isPdfPage: true,
+        pageNum: i,
+      });
+    }
+    return pageImages;
+  };
+
+  const handleFiles = useCallback(async (files) => {
+    for (const file of Array.from(files)) {
+      if (file.type === "application/pdf") {
+        setLoadingMsg(`Conversion PDF en cours...`);
+        setLoading(true);
+        try {
+          const pages = await convertPdfToImages(file);
+          setImages((prev) => [...prev, ...pages]);
+        } catch (e) {
+          setError("Erreur lecture PDF : " + e.message);
+        }
+        setLoading(false);
+        setLoadingMsg("Analyse en cours...");
+      } else if (file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setImages((prev) => [...prev, {
+            id: crypto.randomUUID(), name: file.name,
+            data: e.target.result.split(",")[1], type: file.type, preview: e.target.result,
+          }]);
+        };
+        reader.readAsDataURL(file);
+      }
+    }
   }, []);
 
   const handleCameraCapture = (file) => {
@@ -1102,7 +1206,7 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) 
 
   const analyze = async () => {
     if (!images.length) return;
-    setLoading(true); setError(null);
+    setLoading(true); setLoadingMsg("Analyse en cours..."); setError(null);
     try {
       const result = await extractInvoiceData(images, planComptable, entityType, fecData);
       const ecritures = genererEcritures(result.factures, planComptable, entityType, fecData);
@@ -1141,21 +1245,12 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) 
 
       {/* Deux boutons : caméra PWA native + galerie */}
       <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-        <button
-          style={{ ...css.btn("primary"), flex: 1 }}
-          onClick={() => setShowCamera(true)}
-        >
+        <button style={{ ...css.btn("primary"), flex: 1 }} onClick={() => setShowCamera(true)}>
           {cameraIcon} Prendre en photo
         </button>
         <label style={{ ...css.btn("ghost"), flex: 1, cursor: "pointer", margin: 0 }}>
-          {Icons.upload} Depuis la galerie
-          <input
-            type="file"
-            accept="image/jpeg,image/jpg,image/png,image/webp"
-            multiple
-            style={{ display: "none" }}
-            onChange={(e) => handleFiles(e.target.files)}
-          />
+          {Icons.upload} Galerie / PDF
+          <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf" multiple style={{ display: "none" }} onChange={(e) => handleFiles(e.target.files)} />
         </label>
       </div>
 
@@ -1167,8 +1262,8 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) 
         onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
       >
         <div style={{ fontSize: 12, color: palette.textDim, marginBottom: 4 }}>Ou glisser-déposer ici</div>
-        <div style={{ fontSize: 11, color: palette.textDim }}>JPG, PNG • Plusieurs images à la fois</div>
-        <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" multiple style={{ display: "none" }} onChange={(e) => handleFiles(e.target.files)} />
+        <div style={{ fontSize: 11, color: palette.textDim }}>JPG, PNG, PDF • Plusieurs fichiers à la fois</div>
+        <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf" multiple style={{ display: "none" }} onChange={(e) => handleFiles(e.target.files)} />
       </label>
 
       {images.length > 0 && (
@@ -1188,12 +1283,12 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) 
             ))}
             <label style={{ width: 72, height: 72, borderRadius: 10, border: `1px dashed ${palette.borderLight}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: palette.textDim }}>
               {Icons.plus}
-              <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" multiple style={{ display: "none" }} onChange={(e) => handleFiles(e.target.files)} />
+              <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf" multiple style={{ display: "none" }} onChange={(e) => handleFiles(e.target.files)} />
             </label>
           </div>
           <div style={{ marginTop: 18 }}>
             <button style={css.btn("primary")} onClick={analyze} disabled={loading}>
-              {loading ? (<><div style={css.spinner} /> Analyse en cours...</>) : (<>{Icons.scan} Analyser {images.length} facture{images.length > 1 ? "s" : ""}</>)}
+              {loading ? (<><div style={css.spinner} /> {loadingMsg}</>) : (<>{Icons.scan} Analyser {images.length} page{images.length > 1 ? "s" : ""}</>)}
             </button>
           </div>
         </>
@@ -1267,6 +1362,17 @@ function EcrituresView({ ecritures, entityType, onDelete }) {
             {e.fecMatch && (
               <div style={{ fontSize: 11, color: palette.orange, background: palette.orangeDim, borderRadius: 8, padding: "4px 10px", marginBottom: 8 }}>
                 🔁 Compte réutilisé depuis le FEC — fournisseur connu ({e.fecMatchNom})
+              </div>
+            )}
+
+            {!e.equilibre && (
+              <div style={{ fontSize: 11, color: palette.warn, background: palette.warnDim, borderRadius: 8, padding: "4px 10px", marginBottom: 8 }}>
+                ⚠️ Écart détecté ({e.ecartAvantCorrection > 0 ? "+" : ""}{e.ecartAvantCorrection?.toFixed(2)}€) — corrigé automatiquement sur le compte de charge
+              </div>
+            )}
+            {e.equilibre && (
+              <div style={{ fontSize: 11, color: palette.accent, background: palette.accentDim, borderRadius: 8, padding: "4px 10px", marginBottom: 8 }}>
+                ✓ Écriture équilibrée
               </div>
             )}
 
@@ -1426,7 +1532,7 @@ function PlanComptableView({ planComptable, setPlanComptable, entityType }) {
 }
 
 // ─── APP ───
-export default function ComptaScan() {
+export default function ComptaScan({ user }) {
   const [entityType, setEntityType] = useState("entreprise");
   const [tab, setTab] = useState("scan");
   const [ecritures, setEcritures] = useState([]);
@@ -1480,11 +1586,20 @@ export default function ComptaScan() {
           <div style={css.logoIcon}>C</div>
           <div style={css.logoText}>ComptaScan</div>
         </div>
-        {fecData.length > 0 && (
-          <div style={{ fontSize: 11, color: palette.orange, background: palette.orangeDim, padding: "4px 10px", borderRadius: 20, fontWeight: 600 }}>
-            FEC actif
-          </div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {fecData.length > 0 && (
+            <div style={{ fontSize: 11, color: palette.orange, background: palette.orangeDim, padding: "4px 10px", borderRadius: 20, fontWeight: 600 }}>
+              FEC actif
+            </div>
+          )}
+          <button
+            onClick={() => signOut(auth)}
+            title={user?.email || "Déconnexion"}
+            style={{ padding: "4px 10px", borderRadius: 20, border: `1px solid ${palette.border}`, background: "transparent", color: palette.textDim, fontSize: 11, fontWeight: 600, fontFamily: font, cursor: "pointer" }}
+          >
+            ⎋ Déco
+          </button>
+        </div>
       </div>
 
       <div style={css.entityToggle}>
