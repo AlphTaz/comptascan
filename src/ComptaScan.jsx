@@ -643,7 +643,7 @@ const palette = {
 };
 
 const css = {
-  app: { fontFamily: font, background: palette.bg, color: palette.text, minHeight: "100vh", maxWidth: 480, margin: "0 auto", position: "relative" },
+  app: { fontFamily: font, background: palette.bg, color: palette.text, minHeight: "100vh", maxWidth: 480, margin: "0 auto", position: "relative", overflow: "hidden" },
   header: { padding: "20px 20px 0", display: "flex", alignItems: "center", justifyContent: "space-between" },
   logo: { display: "flex", alignItems: "center", gap: 10 },
   logoIcon: { width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg, ${palette.accent}, #2BA86E)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: palette.bg, boxShadow: `0 0 20px ${palette.accentGlow}` },
@@ -986,13 +986,25 @@ function CameraView({ onCapture, onClose }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } })
+    // Scroll to top et bloquer le scroll body pendant la caméra
+    window.scrollTo(0, 0);
+    document.body.style.overflow = "hidden";
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
+    })
       .then(stream => {
         streamRef.current = stream;
-        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); setReady(true); }
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+          setReady(true);
+        }
       })
-      .catch(() => setError("Impossible d'accéder à la caméra. Vérifiez les permissions dans les réglages de l'app."));
-    return () => { streamRef.current?.getTracks().forEach(t => t.stop()); };
+      .catch(() => setError("Impossible d'accéder à la caméra. Vérifiez les permissions dans les réglages."));
+    return () => {
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      document.body.style.overflow = "";
+    };
   }, []);
 
   const capture = () => {
@@ -1007,15 +1019,16 @@ function CameraView({ onCapture, onClose }) {
     }, "image/jpeg", 0.92);
   };
 
-  const cameraIconSvg = (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-      <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
-      <circle cx="12" cy="13" r="4"/>
-    </svg>
-  );
-
+  // Utilise position absolute sur le conteneur parent plutôt que fixed
+  // pour éviter le bug PWA Android avec les iframes/webview
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 3000, display: "flex", flexDirection: "column" }}>
+    <div style={{
+      position: "absolute", top: 0, left: 0, right: 0,
+      minHeight: "100vh", height: "100%",
+      background: "#000", zIndex: 3000,
+      display: "flex", flexDirection: "column",
+      touchAction: "none",
+    }}>
       {error ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, gap: 16 }}>
           <div style={{ color: palette.danger, fontSize: 14, textAlign: "center" }}>{error}</div>
@@ -1023,23 +1036,44 @@ function CameraView({ onCapture, onClose }) {
         </div>
       ) : (
         <>
-          <video ref={videoRef} style={{ flex: 1, objectFit: "cover", width: "100%" }} playsInline muted />
+          <video
+            ref={videoRef}
+            style={{ flex: 1, objectFit: "cover", width: "100%", minHeight: 0 }}
+            playsInline
+            muted
+            autoPlay
+          />
           <canvas ref={canvasRef} style={{ display: "none" }} />
-          {/* Viseur */}
-          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ width: "75%", aspectRatio: "3/2", border: `2px solid ${palette.accent}`, borderRadius: 12, boxShadow: `0 0 0 2000px rgba(0,0,0,0.35)` }} />
+          {/* Viseur centré */}
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 100, pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: "80%", aspectRatio: "3/2", border: `2px solid ${palette.accent}`, borderRadius: 12 }} />
           </div>
-          {/* Barre basse */}
-          <div style={{ background: "rgba(0,0,0,0.7)", padding: "20px 30px 36px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20 }}>
-            <button style={{ ...css.btnSmall("ghost"), padding: "10px 18px", fontSize: 13 }} onClick={onClose}>Annuler</button>
+          {/* Barre de contrôles */}
+          <div style={{ background: "rgba(0,0,0,0.85)", padding: "16px 30px 40px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <button
+              style={{ ...css.btnSmall("ghost"), padding: "10px 18px", fontSize: 13, color: palette.text, borderColor: palette.border }}
+              onClick={onClose}
+            >
+              Annuler
+            </button>
             <button
               onClick={capture}
               disabled={!ready}
-              style={{ width: 68, height: 68, borderRadius: "50%", border: `3px solid ${palette.accent}`, background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: palette.accent, cursor: ready ? "pointer" : "default", opacity: ready ? 1 : 0.4, transition: "all 0.2s" }}
+              style={{
+                width: 68, height: 68, borderRadius: "50%",
+                border: `3px solid ${palette.accent}`,
+                background: ready ? palette.accentDim : "transparent",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: palette.accent, cursor: ready ? "pointer" : "default",
+                opacity: ready ? 1 : 0.4, transition: "all 0.2s",
+              }}
             >
-              {cameraIconSvg}
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
             </button>
-            <div style={{ width: 80 }} />
+            <div style={{ width: 70 }} />
           </div>
         </>
       )}
