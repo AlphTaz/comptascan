@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom/client";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "./firebase.js";
+import { auth, onAuthStateChanged } from "./firebase.js";
 import ComptaScan from "./ComptaScan.jsx";
 import AuthScreen from "./AuthScreen.jsx";
 import { registerSW } from "virtual:pwa-register";
