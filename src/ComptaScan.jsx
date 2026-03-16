@@ -769,7 +769,7 @@ function matchFournisseurFEC(nomFacture, fecData) {
 
 // ─── AI ───
 import { auth, PROXY_URL } from "./firebase.js";
-import { signOut } from "firebase/auth";
+import { signOut } from "./firebase.js";
 
 async function extractInvoiceData(images, planComptable, entityType, fecData) {
   const config = ENTITY_CONFIG[entityType];
