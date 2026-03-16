@@ -977,13 +977,83 @@ function FecView({ fecData, setFecData }) {
   );
 }
 
+// ─── CAMERA VIEW ───
+function CameraView({ onCapture, onClose }) {
+  const videoRef = useRef();
+  const canvasRef = useRef();
+  const streamRef = useRef();
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } })
+      .then(stream => {
+        streamRef.current = stream;
+        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); setReady(true); }
+      })
+      .catch(() => setError("Impossible d'accéder à la caméra. Vérifiez les permissions dans les réglages de l'app."));
+    return () => { streamRef.current?.getTracks().forEach(t => t.stop()); };
+  }, []);
+
+  const capture = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    canvas.toBlob(blob => {
+      const file = new File([blob], `scan_${Date.now()}.jpg`, { type: "image/jpeg" });
+      onCapture(file);
+    }, "image/jpeg", 0.92);
+  };
+
+  const cameraIconSvg = (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+      <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+      <circle cx="12" cy="13" r="4"/>
+    </svg>
+  );
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 3000, display: "flex", flexDirection: "column" }}>
+      {error ? (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, gap: 16 }}>
+          <div style={{ color: palette.danger, fontSize: 14, textAlign: "center" }}>{error}</div>
+          <button style={{ ...css.btn("ghost"), width: "auto", padding: "10px 24px" }} onClick={onClose}>Fermer</button>
+        </div>
+      ) : (
+        <>
+          <video ref={videoRef} style={{ flex: 1, objectFit: "cover", width: "100%" }} playsInline muted />
+          <canvas ref={canvasRef} style={{ display: "none" }} />
+          {/* Viseur */}
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: "75%", aspectRatio: "3/2", border: `2px solid ${palette.accent}`, borderRadius: 12, boxShadow: `0 0 0 2000px rgba(0,0,0,0.35)` }} />
+          </div>
+          {/* Barre basse */}
+          <div style={{ background: "rgba(0,0,0,0.7)", padding: "20px 30px 36px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20 }}>
+            <button style={{ ...css.btnSmall("ghost"), padding: "10px 18px", fontSize: 13 }} onClick={onClose}>Annuler</button>
+            <button
+              onClick={capture}
+              disabled={!ready}
+              style={{ width: 68, height: 68, borderRadius: "50%", border: `3px solid ${palette.accent}`, background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: palette.accent, cursor: ready ? "pointer" : "default", opacity: ready ? 1 : 0.4, transition: "all 0.2s" }}
+            >
+              {cameraIconSvg}
+            </button>
+            <div style={{ width: 80 }} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── SCAN VIEW ───
 function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [dragOver, setDragOver] = useState(false);
-  const fileRef = useRef();
+  const [showCamera, setShowCamera] = useState(false);
 
   const handleFiles = useCallback((files) => {
     Array.from(files).forEach((file) => {
@@ -995,6 +1065,11 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) 
       reader.readAsDataURL(file);
     });
   }, []);
+
+  const handleCameraCapture = (file) => {
+    handleFiles([file]);
+    setShowCamera(false);
+  };
 
   const analyze = async () => {
     if (!images.length) return;
@@ -1010,8 +1085,17 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) 
     setLoading(false);
   };
 
+  const cameraIcon = (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+      <circle cx="12" cy="13" r="4"/>
+    </svg>
+  );
+
   return (
     <div style={css.section}>
+      {showCamera && <CameraView onCapture={handleCameraCapture} onClose={() => setShowCamera(false)} />}
+
       <div style={css.sectionTitle}>Ajouter des factures</div>
 
       {fecData && fecData.length > 0 && (
@@ -1026,30 +1110,36 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) 
           : <><strong>Mode Entreprise</strong> — TVA déductible extraite automatiquement. Écritures HT / TVA / TTC.</>}
       </div>
 
-      {/* Zone upload — <label> wrappant l'<input> : seule technique fiable sur Chrome Android
-          pour forcer la galerie sans déclencher la caméra ARCore. Sans capture + MIME exacts. */}
+      {/* Deux boutons : caméra PWA native + galerie */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+        <button
+          style={{ ...css.btn("primary"), flex: 1 }}
+          onClick={() => setShowCamera(true)}
+        >
+          {cameraIcon} Prendre en photo
+        </button>
+        <label style={{ ...css.btn("ghost"), flex: 1, cursor: "pointer", margin: 0 }}>
+          {Icons.upload} Depuis la galerie
+          <input
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,image/webp"
+            multiple
+            style={{ display: "none" }}
+            onChange={(e) => handleFiles(e.target.files)}
+          />
+        </label>
+      </div>
+
+      {/* Zone de dépôt (desktop) */}
       <label
         style={{ ...css.uploadZone(dragOver), display: "block", cursor: "pointer" }}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
       >
-        <div style={{ marginBottom: 12, opacity: 0.9 }}>{Icons.upload}</div>
-        <div style={{ fontSize: 15, fontWeight: 600, color: palette.text, marginBottom: 6 }}>
-          Toucher pour ouvrir la galerie
-        </div>
-        <div style={{ fontSize: 12, color: palette.textDim, marginBottom: 4 }}>
-          Sélectionnez vos photos de factures
-        </div>
+        <div style={{ fontSize: 12, color: palette.textDim, marginBottom: 4 }}>Ou glisser-déposer ici</div>
         <div style={{ fontSize: 11, color: palette.textDim }}>JPG, PNG • Plusieurs images à la fois</div>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/jpeg,image/jpg,image/png,image/webp"
-          multiple
-          style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
-          onChange={(e) => handleFiles(e.target.files)}
-        />
+        <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" multiple style={{ display: "none" }} onChange={(e) => handleFiles(e.target.files)} />
       </label>
 
       {images.length > 0 && (
