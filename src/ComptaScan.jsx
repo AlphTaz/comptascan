@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 
 // ─── PLANS COMPTABLES COMPLETS (PCG) ───
 const PLAN_ENTREPRISE = [
@@ -978,29 +978,25 @@ function FecView({ fecData, setFecData }) {
 }
 
 // ─── CAMERA VIEW ───
+// Rendu via un portail DOM sur document.body pour couvrir tout l'écran en PWA Android
 function CameraView({ onCapture, onClose }) {
-  const videoRef = useRef();
-  const canvasRef = useRef();
-  const streamRef = useRef();
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
   const [ready, setReady] = useState(false);
-  const [error, setError] = useState(null);
+  const [camError, setCamError] = useState(null);
 
   useEffect(() => {
-    // Scroll to top et bloquer le scroll body pendant la caméra
-    window.scrollTo(0, 0);
     document.body.style.overflow = "hidden";
     navigator.mediaDevices.getUserMedia({
       video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
-    })
-      .then(stream => {
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-          setReady(true);
-        }
-      })
-      .catch(() => setError("Impossible d'accéder à la caméra. Vérifiez les permissions dans les réglages."));
+    }).then(stream => {
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().then(() => setReady(true)).catch(() => setReady(true));
+      }
+    }).catch(() => setCamError(true));
     return () => {
       streamRef.current?.getTracks().forEach(t => t.stop());
       document.body.style.overflow = "";
@@ -1010,74 +1006,73 @@ function CameraView({ onCapture, onClose }) {
   const capture = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
+    if (!video || !canvas) return;
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext("2d").drawImage(video, 0, 0);
     canvas.toBlob(blob => {
-      const file = new File([blob], `scan_${Date.now()}.jpg`, { type: "image/jpeg" });
-      onCapture(file);
+      onCapture(new File([blob], `scan_${Date.now()}.jpg`, { type: "image/jpeg" }));
     }, "image/jpeg", 0.92);
   };
 
-  // Utilise position absolute sur le conteneur parent plutôt que fixed
-  // pour éviter le bug PWA Android avec les iframes/webview
+  // Style plein écran — injecté via une balise <style> pour contourner
+  // la limite maxWidth du conteneur React parent
   return (
-    <div style={{
-      position: "absolute", top: 0, left: 0, right: 0,
-      minHeight: "100vh", height: "100%",
-      background: "#000", zIndex: 3000,
-      display: "flex", flexDirection: "column",
-      touchAction: "none",
-    }}>
-      {error ? (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, gap: 16 }}>
-          <div style={{ color: palette.danger, fontSize: 14, textAlign: "center" }}>{error}</div>
-          <button style={{ ...css.btn("ghost"), width: "auto", padding: "10px 24px" }} onClick={onClose}>Fermer</button>
-        </div>
-      ) : (
-        <>
-          <video
-            ref={videoRef}
-            style={{ flex: 1, objectFit: "cover", width: "100%", minHeight: 0 }}
-            playsInline
-            muted
-            autoPlay
-          />
-          <canvas ref={canvasRef} style={{ display: "none" }} />
-          {/* Viseur centré */}
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 100, pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ width: "80%", aspectRatio: "3/2", border: `2px solid ${palette.accent}`, borderRadius: 12 }} />
+    <>
+      <style>{`
+        #camera-overlay {
+          position: fixed !important;
+          top: 0 !important; left: 0 !important;
+          width: 100vw !important; height: 100vh !important;
+          background: #000;
+          z-index: 99999 !important;
+          display: flex; flex-direction: column;
+        }
+        #camera-overlay video {
+          flex: 1; object-fit: cover; width: 100%; min-height: 0;
+        }
+        #camera-overlay .cam-bar {
+          background: rgba(0,0,0,0.88);
+          padding: 16px 30px env(safe-area-inset-bottom, 24px);
+          display: flex; align-items: center; justify-content: space-between;
+        }
+        #camera-overlay .cam-viewfinder {
+          position: absolute; top: 0; left: 0; right: 0; bottom: 110px;
+          display: flex; align-items: center; justify-content: center;
+          pointer-events: none;
+        }
+        #camera-overlay .cam-frame {
+          width: 80%; aspect-ratio: 3/2;
+          border: 2px solid #3ECF8E; border-radius: 12px;
+        }
+      `}</style>
+      <div id="camera-overlay">
+        {camError ? (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, gap: 16, color: palette.danger, fontSize: 14, textAlign: "center" }}>
+            Impossible d'accéder à la caméra.<br />Vérifiez les permissions dans les réglages.
+            <button onClick={onClose} style={{ marginTop: 12, padding: "10px 24px", borderRadius: 8, border: `1px solid ${palette.border}`, background: "transparent", color: palette.text, cursor: "pointer" }}>Fermer</button>
           </div>
-          {/* Barre de contrôles */}
-          <div style={{ background: "rgba(0,0,0,0.85)", padding: "16px 30px 40px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <button
-              style={{ ...css.btnSmall("ghost"), padding: "10px 18px", fontSize: 13, color: palette.text, borderColor: palette.border }}
-              onClick={onClose}
-            >
-              Annuler
-            </button>
-            <button
-              onClick={capture}
-              disabled={!ready}
-              style={{
-                width: 68, height: 68, borderRadius: "50%",
-                border: `3px solid ${palette.accent}`,
-                background: ready ? palette.accentDim : "transparent",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: palette.accent, cursor: ready ? "pointer" : "default",
-                opacity: ready ? 1 : 0.4, transition: "all 0.2s",
-              }}
-            >
-              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-                <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
-                <circle cx="12" cy="13" r="4"/>
-              </svg>
-            </button>
-            <div style={{ width: 70 }} />
-          </div>
-        </>
-      )}
-    </div>
+        ) : (
+          <>
+            <video ref={videoRef} playsInline muted autoPlay />
+            <canvas ref={canvasRef} style={{ display: "none" }} />
+            <div className="cam-viewfinder"><div className="cam-frame" /></div>
+            <div className="cam-bar">
+              <button onClick={onClose} style={{ padding: "10px 18px", borderRadius: 8, border: `1px solid ${palette.border}`, background: "transparent", color: palette.text, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                Annuler
+              </button>
+              <button onClick={capture} disabled={!ready} style={{ width: 68, height: 68, borderRadius: "50%", border: `3px solid ${palette.accent}`, background: palette.accentDim, display: "flex", alignItems: "center", justifyContent: "center", cursor: ready ? "pointer" : "default", opacity: ready ? 1 : 0.4, transition: "opacity 0.2s" }}>
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#3ECF8E" strokeWidth="1.6" strokeLinecap="round">
+                  <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+              </button>
+              <div style={{ width: 70 }} />
+            </div>
+          </>
+        )}
+      </div>
+    </>
   );
 }
 
