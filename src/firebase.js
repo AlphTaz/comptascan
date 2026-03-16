@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, signOut } from "firebase/auth";
 
 // ⚠️ Remplacez ces valeurs par celles de votre console Firebase :
 // Console Firebase → Paramètres du projet (⚙️) → Vos applications → Config
@@ -14,4 +14,5 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export { signOut };
 export const PROXY_URL = "https://proxyai-2czfc6w5yq-uc.a.run.app";
