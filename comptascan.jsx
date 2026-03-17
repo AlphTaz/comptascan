@@ -1296,31 +1296,32 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) 
         </div>
       )}
       {images.length > 0 && (
-        <>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
-            {images.map((img, i) => (
-              <div key={img.id} style={{ position: "relative", width: 72, height: 72, borderRadius: 10, overflow: "hidden", border: `1px solid ${palette.border}` }}>
-                <img src={img.preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                <div style={{ position: "absolute", top: 0, right: 0, background: "rgba(0,0,0,0.7)", borderRadius: "0 0 0 8px", padding: "3px 5px", cursor: "pointer", display: "flex" }}
-                  onClick={(e) => { e.stopPropagation(); setImages((p) => p.filter((x) => x.id !== img.id)); }}>
-                  {Icons.x}
-                </div>
-                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "rgba(0,0,0,0.6)", padding: "2px 6px", fontSize: 9, color: palette.textMuted, textAlign: "center" }}>
-                  Page {i + 1}
-                </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
+          {images.map((img, i) => (
+            <div key={img.id} style={{ position: "relative", width: 72, height: 72, borderRadius: 10, overflow: "hidden", border: `1px solid ${palette.border}` }}>
+              <img src={img.preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <div style={{ position: "absolute", top: 0, right: 0, background: "rgba(0,0,0,0.7)", borderRadius: "0 0 0 8px", padding: "3px 5px", cursor: "pointer", display: "flex" }}
+                onClick={(e) => { e.stopPropagation(); setImages((p) => p.filter((x) => x.id !== img.id)); }}>
+                {Icons.x}
               </div>
-            ))}
-            <label style={{ width: 72, height: 72, borderRadius: 10, border: `1px dashed ${palette.borderLight}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: palette.textDim }}>
-              {Icons.plus}
-              <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf" multiple style={{ display: "none" }} onChange={(e) => handleFiles(e.target.files)} />
-            </label>
-          </div>
-          <div style={{ marginTop: 18 }}>
-            <button style={css.btn("primary")} onClick={analyze} disabled={loading}>
-              {loading ? (<><div style={css.spinner} /> {loadingMsg}</>) : (<>{Icons.scan} Analyser {images.length} page{images.length > 1 ? "s" : ""}</>)}
-            </button>
-          </div>
-        </>
+              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "rgba(0,0,0,0.6)", padding: "2px 6px", fontSize: 9, color: palette.textMuted, textAlign: "center" }}>
+                Page {i + 1}
+              </div>
+            </div>
+          ))}
+          <label style={{ width: 72, height: 72, borderRadius: 10, border: `1px dashed ${palette.borderLight}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: palette.textDim }}>
+            {Icons.plus}
+            <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf" multiple style={{ display: "none" }} onChange={(e) => handleFiles(e.target.files)} />
+          </label>
+        </div>
+      )}
+
+      {images.length > 0 && (
+        <div style={{ marginTop: 18 }}>
+          <button style={css.btn("primary")} onClick={analyze} disabled={loading}>
+            {loading ? (<><div style={css.spinner} /> {loadingMsg}</>) : (<>{Icons.scan} Analyser {images.length} page{images.length > 1 ? "s" : ""}</>)}
+          </button>
+        </div>
       )}
 
       {error && (
