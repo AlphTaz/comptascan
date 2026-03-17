@@ -24,9 +24,6 @@ function Navbar({ user, onGoApp, onGoAccount, onLogin }) {
             <button onClick={onGoAccount} style={{ padding: "7px 14px", borderRadius: 8, border: `1px solid ${palette.border}`, background: "transparent", color: palette.textMuted, fontSize: 13, fontWeight: 500 }}>
               Mon compte
             </button>
-            <button onClick={onGoApp} style={{ padding: "7px 16px", borderRadius: 8, border: "none", background: `linear-gradient(135deg, ${palette.accent}, ${palette.accentDark})`, color: palette.bg, fontSize: 13, fontWeight: 700 }}>
-              Ouvrir l'outil →
-            </button>
           </>
         ) : (
           <>
