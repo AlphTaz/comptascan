@@ -647,7 +647,7 @@ const css = {
   header: { padding: "20px 20px 0", display: "flex", alignItems: "center", justifyContent: "space-between" },
   logo: { display: "flex", alignItems: "center", gap: 10 },
   logoIcon: { width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg, ${palette.accent}, #2BA86E)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: palette.bg, boxShadow: `0 0 20px ${palette.accentGlow}` },
-  logoText: { fontSize: 15, fontWeight: 700, letterSpacing: -0.5, color: palette.white },
+  logoText: { fontSize: 20, fontWeight: 700, letterSpacing: -0.5, color: palette.white },
   entityToggle: { display: "flex", gap: 0, background: palette.surface, borderRadius: 12, padding: 3, border: `1px solid ${palette.border}`, margin: "16px 20px 0" },
   entityBtn: (active, type) => ({ flex: 1, padding: "10px 14px", borderRadius: 10, border: "none", background: active ? (type === "entreprise" ? palette.accentDim : palette.purpleDim) : "transparent", color: active ? (type === "entreprise" ? palette.accent : palette.purple) : palette.textMuted, fontSize: 13, fontWeight: 600, fontFamily: font, cursor: "pointer", transition: "all 0.25s", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }),
   nav: { display: "flex", gap: 4, background: palette.surface, borderRadius: 12, padding: 3, margin: "12px 20px 0" },
@@ -701,201 +701,180 @@ function downloadCSV(content, filename) {
 
 // ─── FEC PARSER ───
 // FEC colonnes standard : JournalCode|JournalLib|EcritureNum|EcritureDate|CompteNum|CompteLib|CompAuxNum|CompAuxLib|PieceRef|PieceDate|EcritureLib|Debit|Credit|EcritureLet|DateLet|ValidDate|Montantdevise|Idevise
+// ─── ANALYSE STRUCTURELLE DU FEC ───
+function detecterStructureFEC(lines, sep) {
+  const headers = lines[0].split(sep).map(h => h.trim().replace(/"/g, "").toLowerCase());
+
+  const col = (candidates) => {
+    for (const c of candidates) {
+      const i = headers.findIndex(h => h === c || h.replace(/[_\s]/g, "") === c.replace(/[_\s]/g, ""));
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
+
+  const idx = {
+    journalCode:  col(["journalcode","journal_code","codejournal"]),
+    journalLib:   col(["journallib","journal_lib","libellejournal"]),
+    ecritureNum:  col(["ecriturenum","ecriture_num","numeropiece"]),
+    ecritureDate: col(["ecrituredate","ecriture_date","date","datepiece"]),
+    compteNum:    col(["comptenum","compte_num","numerocompte"]),
+    compteLib:    col(["comptelib","compte_lib","libellecompte"]),
+    compAuxNum:   col(["compauxnum","compaux_num","numerocomptaux","comptauxiliaire"]),
+    compAuxLib:   col(["compauxlib","compaux_lib","libellecomptaux"]),
+    pieceRef:     col(["pieceref","piece_ref","referencedocument","numerofacture"]),
+    pieceDate:    col(["piecedate","piece_date"]),
+    ecritureLib:  col(["ecriturelib","ecriture_lib","libellecriture","libelle"]),
+    debit:        col(["debit","montantdebit"]),
+    credit:       col(["credit","montantcredit"]),
+    montant:      col(["montant","montantdevise"]),
+    sens:         col(["sens","debitcredit"]),
+    lettrage:     col(["ecriturelet","ecriture_let","lettrage"]),
+    validDate:    col(["validdate","valid_date","datevalidation"]),
+  };
+
+  const sample = lines.slice(1, 301).map(l => l.split(sep).map(c => c.trim().replace(/"/g, "")));
+
+  // Longueur modale des comptes
+  const longueurs = sample.map(c => idx.compteNum >= 0 ? c[idx.compteNum] : "").filter(v => v && /^\d+$/.test(v)).map(v => v.length);
+  const freqLen = longueurs.reduce((a, l) => { a[l] = (a[l] || 0) + 1; return a; }, {});
+  const compteLength = parseInt(Object.entries(freqLen).sort((a,b) => b[1]-a[1])[0]?.[0] || "6");
+
+  // Comptes auxiliaires
+  const aCompteAux = idx.compAuxNum >= 0 && sample.some(c => c[idx.compAuxNum]?.trim());
+  const aCompAuxLib = idx.compAuxLib >= 0 && sample.some(c => c[idx.compAuxLib]?.trim());
+
+  // Journaux
+  const journaux = {};
+  sample.forEach(c => { const j = idx.journalCode >= 0 ? c[idx.journalCode] : ""; if (j) journaux[j] = (journaux[j] || 0) + 1; });
+  const journauxAchat = Object.keys(journaux).filter(j => /^(ACH|AH|HA|AC|FAC|FOU|ACHAT)/i.test(j));
+  const journalAchatDetecte = journauxAchat[0] || "ACH";
+
+  // Format date
+  const dateEx = idx.ecritureDate >= 0 ? (sample.find(c => c[idx.ecritureDate]) || [])[idx.ecritureDate] : null;
+  let formatDate = "YYYYMMDD";
+  if (dateEx) {
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateEx)) formatDate = "YYYY-MM-DD";
+    else if (/^\d{2}\/\d{2}\/\d{4}/.test(dateEx)) formatDate = "DD/MM/YYYY";
+    else if (/^\d{2}-\d{2}-\d{4}/.test(dateEx)) formatDate = "DD-MM-YYYY";
+  }
+
+  // Mode montant unique + sens vs débit/crédit séparés
+  const modeMontant = idx.sens >= 0 || (idx.debit < 0 && idx.montant >= 0);
+
+  // Comptes fournisseurs et TVA les plus utilisés
+  const cptFourn = {}; const cptTVA = {};
+  sample.forEach(c => {
+    const num = idx.compteNum >= 0 ? c[idx.compteNum] : "";
+    if (num.startsWith("401")) cptFourn[num] = (cptFourn[num] || 0) + 1;
+    if (num.startsWith("4456")) cptTVA[num] = (cptTVA[num] || 0) + 1;
+  });
+  const compteFournisseurPrincipal = Object.entries(cptFourn).sort((a,b) => b[1]-a[1])[0]?.[0] || null;
+  const compteTVAPrincipal = Object.entries(cptTVA).sort((a,b) => b[1]-a[1])[0]?.[0] || null;
+
+  return { idx, sep, headers, compteLength, aCompteAux, aCompAuxLib, journaux, journalAchatDetecte, formatDate, modeMontant, compteFournisseurPrincipal, compteTVAPrincipal };
+}
+
 function parseFEC(text) {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return [];
   const sep = lines[0].includes("\t") ? "\t" : "|";
-  const headers = lines[0].split(sep).map(h => h.trim().replace(/"/g, "").toLowerCase());
+  const structure = detecterStructureFEC(lines, sep);
+  const { idx, compteLength, journalAchatDetecte } = structure;
 
-  const idx = {
-    compteNum: headers.findIndex(h => h === "comptenum" || h === "compte_num" || h === "compte num"),
-    compteLib: headers.findIndex(h => h === "comptelib" || h === "compte_lib"),
-    compAuxLib: headers.findIndex(h => h === "compauxlib" || h === "compaux_lib"),
-    ecritureLib: headers.findIndex(h => h === "ecriturelib" || h === "ecriture_lib"),
-    journalCode: headers.findIndex(h => h === "journalcode" || h === "journal_code"),
-    debit: headers.findIndex(h => h === "debit" || h === "montantdebit"),
-    credit: headers.findIndex(h => h === "credit" || h === "montantcredit"),
-  };
-
-  const fournisseurMap = {}; // normalized name → { compte, libelle, journal, ecritures[] }
+  const fournisseurMap = {};
 
   lines.slice(1).forEach(line => {
     const cols = line.split(sep).map(c => c.trim().replace(/"/g, ""));
-    const compteNum = idx.compteNum >= 0 ? cols[idx.compteNum] : "";
+    const compteNum   = idx.compteNum   >= 0 ? cols[idx.compteNum]   : "";
+    const compAuxLib  = idx.compAuxLib  >= 0 ? cols[idx.compAuxLib]  : "";
+    const compAuxNum  = idx.compAuxNum  >= 0 ? cols[idx.compAuxNum]  : "";
     const ecritureLib = idx.ecritureLib >= 0 ? cols[idx.ecritureLib] : "";
-    const compAuxLib = idx.compAuxLib >= 0 ? cols[idx.compAuxLib] : "";
     const journalCode = idx.journalCode >= 0 ? cols[idx.journalCode] : "";
-    const debit = parseFloat((idx.debit >= 0 ? cols[idx.debit] : "0").replace(",", ".")) || 0;
-    const credit = parseFloat((idx.credit >= 0 ? cols[idx.credit] : "0").replace(",", ".")) || 0;
+    const pieceRef    = idx.pieceRef    >= 0 ? cols[idx.pieceRef]    : "";
 
-    // On s'intéresse aux comptes fournisseurs (401xxx) pour extraire le nom du fournisseur
-    if (compteNum.startsWith("401") && compAuxLib) {
-      const nomNorm = compAuxLib.trim().toLowerCase();
-      if (!fournisseurMap[nomNorm]) {
-        fournisseurMap[nomNorm] = { nomOriginal: compAuxLib.trim(), compteAux: compteNum, journal: journalCode, ecritures: [] };
-      }
-      fournisseurMap[nomNorm].ecritures.push({ ecritureLib, debit, credit });
+    let debit = 0, credit = 0;
+    if (structure.modeMontant && idx.montant >= 0) {
+      const montant = parseFloat((cols[idx.montant] || "0").replace(",", ".")) || 0;
+      const sens = idx.sens >= 0 ? (cols[idx.sens] || "").toUpperCase() : "";
+      if (sens === "D") debit = montant; else credit = montant;
+    } else {
+      debit  = parseFloat((idx.debit  >= 0 ? cols[idx.debit]  : "0").replace(",", ".")) || 0;
+      credit = parseFloat((idx.credit >= 0 ? cols[idx.credit] : "0").replace(",", ".")) || 0;
     }
 
-    // Aussi on cherche les lignes de charges associées dans le journal ACH
-    if (compteNum.startsWith("6") && ecritureLib && (journalCode === "ACH" || journalCode === "ACH")) {
-      const nomNorm = ecritureLib.toLowerCase().replace(/\s*-\s*facture.*$/i, "").replace(/\s*\d{4,}.*$/, "").trim();
-      if (nomNorm.length > 2 && !fournisseurMap[nomNorm]) {
-        fournisseurMap[nomNorm] = { nomOriginal: nomNorm, compteCharge: compteNum, journal: journalCode, ecritures: [] };
+    if (compteNum.startsWith("401")) {
+      const nomFourn = compAuxLib || ecritureLib || "";
+      if (nomFourn) {
+        const nomNorm = nomFourn.trim().toLowerCase();
+        if (!fournisseurMap[nomNorm]) {
+          fournisseurMap[nomNorm] = { nomOriginal: nomFourn.trim(), compteAux: compteNum, compteAuxNum: compAuxNum || null, journal: journalCode, ecritures: [] };
+        }
+        fournisseurMap[nomNorm].ecritures.push({ ecritureLib, pieceRef, debit, credit });
       }
-      if (fournisseurMap[nomNorm] && !fournisseurMap[nomNorm].compteCharge) {
-        fournisseurMap[nomNorm].compteCharge = compteNum;
+    }
+
+    const isJournalAchat = journalCode === journalAchatDetecte || /^(ACH|AH)/i.test(journalCode);
+    if (compteNum.startsWith("6") && ecritureLib && isJournalAchat) {
+      const nomNorm = ecritureLib.toLowerCase().replace(/\s*-\s*facture.*$/i,"").replace(/\s*\d{4,}.*$/,"").trim();
+      if (nomNorm.length > 2) {
+        if (!fournisseurMap[nomNorm]) fournisseurMap[nomNorm] = { nomOriginal: nomNorm, compteCharge: compteNum, journal: journalCode, ecritures: [] };
+        if (!fournisseurMap[nomNorm].compteCharge) fournisseurMap[nomNorm].compteCharge = compteNum;
       }
     }
   });
 
-  return Object.values(fournisseurMap);
+  const result = Object.values(fournisseurMap);
+  Object.defineProperty(result, "_structure", { value: structure, enumerable: false });
+  Object.defineProperty(result, "_compteLength", { value: compteLength, enumerable: false });
+  return result;
 }
 
-// Recherche un fournisseur connu dans le FEC à partir d'un nom extrait de facture
+function adapterCompte(comptePCG, longueurCible) {
+  if (!longueurCible || longueurCible === comptePCG.length) return comptePCG;
+  if (longueurCible > comptePCG.length) return comptePCG.padEnd(longueurCible, "0");
+  return comptePCG.slice(0, longueurCible);
+}
+
 function matchFournisseurFEC(nomFacture, fecData) {
   if (!fecData || !fecData.length || !nomFacture) return null;
   const nom = nomFacture.toLowerCase().trim();
-  // Correspondance exacte d'abord
   let match = fecData.find(f => f.nomOriginal.toLowerCase() === nom);
   if (match) return match;
-  // Correspondance partielle (le nom FEC contient le nom facture ou inversement)
-  match = fecData.find(f => {
-    const fn = f.nomOriginal.toLowerCase();
-    return fn.includes(nom) || nom.includes(fn);
-  });
+  match = fecData.find(f => { const fn = f.nomOriginal.toLowerCase(); return fn.includes(nom) || nom.includes(fn); });
   return match || null;
-}
-
-// ─── AI ───
-import { auth, PROXY_URL } from "./firebase.js";
-import { signOut } from "./firebase.js";
-
-async function extractInvoiceData(images, planComptable, entityType, fecData) {
-  const config = ENTITY_CONFIG[entityType];
-  const planSummary = planComptable.map((c) => `${c.compte} - ${c.libelle} (${c.type})`).join("\n");
-  const imageContents = images.map((img) => ({ type: "image", source: { type: "base64", media_type: img.type, data: img.data } }));
-
-  const tvaInstruction = config.tvaApplicable
-    ? `L'entité est ASSUJETTIE à la TVA. Extrais le montant HT, la TVA et le TTC. Si la TVA n'apparaît pas, essaie de la déduire (taux standard 20%, intermédiaire 10%, réduit 5.5%).`
-    : `L'entité est une ASSOCIATION généralement NON ASSUJETTIE à la TVA. Le montant TTC = montant total payé. Mets tva à 0 et montant_ht = montant_ttc SAUF si la facture montre explicitement une TVA récupérable.`;
-
-  const contextInstruction = entityType === "association"
-    ? `C'est la comptabilité d'une ASSOCIATION loi 1901. Utilise la terminologie associative (emplois/ressources, excédent/déficit).`
-    : `C'est la comptabilité d'une ENTREPRISE commerciale. Terminologie classique (charges/produits, bénéfice/perte).`;
-
-  const fecContext = fecData && fecData.length > 0
-    ? `\nFOURNISSEURS DÉJÀ COMPTABILISÉS (extrait du FEC) :\n${fecData.slice(0, 30).map(f => `- "${f.nomOriginal}" → compte charge: ${f.compteCharge || "?"}, compte aux: ${f.compteAux || "?"}`).join("\n")}\n\nSi le fournisseur de la facture correspond à un fournisseur du FEC, utilise IMPÉRATIVEMENT son compte_charge déjà utilisé.`
-    : "";
-
-  // Récupérer le token Firebase Auth
-  const currentUser = auth.currentUser;
-  if (!currentUser) throw new Error("Utilisateur non connecté");
-  const token = await currentUser.getIdToken();
-
-  const response = await fetch(PROXY_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      tool: "comptascan",
-      messages: [{
-        role: "user",
-        content: [
-          ...imageContents,
-          {
-            type: "text",
-            text: `Tu es un expert-comptable français. ${contextInstruction}
-
-Analyse cette/ces facture(s) et extrais les données pour générer les écritures comptables.
-
-${tvaInstruction}
-
-PLAN COMPTABLE DISPONIBLE :
-${planSummary}
-${fecContext}
-
-Réponds UNIQUEMENT avec un JSON valide (sans backticks, sans texte autour) :
-{
-  "factures": [
-    {
-      "fournisseur": "Nom du fournisseur",
-      "numero_facture": "N° de facture",
-      "date": "YYYY-MM-DD",
-      "montant_ht": 0.00,
-      "tva": 0.00,
-      "montant_ttc": 0.00,
-      "taux_tva": 20,
-      "description": "Description courte",
-      "compte_charge": "Numéro de compte le plus approprié",
-      "fec_match": true
-    }
-  ]
-}
-
-Si le fournisseur est reconnu dans le FEC, mets fec_match à true. Utilise les comptes du plan comptable fourni.`,
-          },
-        ],
-      }],
-    }),
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || `Erreur proxy (${response.status})`);
-  }
-
-  const data = await response.json();
-  const text = data.content.filter((b) => b.type === "text").map((b) => b.text).join("");
-  return JSON.parse(text.replace(/```json|```/g, "").trim());
-}
-
-// ─── VÉRIFICATION D'ÉQUILIBRE ───
-function verifierEquilibre(lignes) {
-  const totalDebit = lignes.reduce((s, l) => s + (l.debit || 0), 0);
-  const totalCredit = lignes.reduce((s, l) => s + (l.credit || 0), 0);
-  const ecart = Math.round((totalDebit - totalCredit) * 100) / 100;
-  if (Math.abs(ecart) < 0.01) return { equilibre: true, ecart: 0, lignes };
-  // Correction automatique : ajustement sur la dernière ligne de charge (débit)
-  const lignesCorrigees = [...lignes];
-  const idxCharge = lignesCorrigees.findIndex(l => l.debit > 0);
-  if (idxCharge >= 0) {
-    lignesCorrigees[idxCharge] = {
-      ...lignesCorrigees[idxCharge],
-      debit: Math.round((lignesCorrigees[idxCharge].debit - ecart) * 100) / 100,
-    };
-  }
-  return { equilibre: false, ecart, lignes: lignesCorrigees };
 }
 
 function genererEcritures(factures, planComptable, entityType, fecData) {
   const config = ENTITY_CONFIG[entityType];
+  const compteLength = fecData?._compteLength || 6;
+  const structure = fecData?._structure || null;
+
+  const compteFournisseurBase = structure?.compteFournisseurPrincipal || adapterCompte(config.compteFournisseur, compteLength);
+  const compteTVABase = structure?.compteTVAPrincipal || adapterCompte(config.compteTVA, compteLength);
+  const journalAchat = structure?.journalAchatDetecte || config.defaultJournal;
+
   return factures.map((f, idx) => {
     const piece = f.numero_facture || `FAC-${String(idx + 1).padStart(4, "0")}`;
     const fecMatch = matchFournisseurFEC(f.fournisseur, fecData);
-    const compteCharge = (fecMatch?.compteCharge) || f.compte_charge || "607000";
-    const libelleCharge = planComptable.find((c) => c.compte === compteCharge)?.libelle || "Achat";
+    const compteChargeRaw = f.compte_charge || "607000";
+    const compteCharge = fecMatch?.compteCharge || adapterCompte(compteChargeRaw, compteLength);
+    const libelleCharge = planComptable.find((c) => c.compte === compteChargeRaw)?.libelle || "Achat";
 
     const lignes = [{
       compte: compteCharge,
-      libelle: `${f.fournisseur} - ${f.description || libelleCharge}- ${piece}`,
+      libelle: `${f.fournisseur} - ${f.description || libelleCharge} - ${piece}`,
       debit: Math.round((config.tvaApplicable ? f.montant_ht : f.montant_ttc) * 100) / 100,
       credit: 0,
     }];
+
     if (config.tvaApplicable && f.tva > 0) {
-      lignes.push({
-        compte: config.compteTVA,
-        libelle: `TVA déductible ${f.taux_tva || 20}% - ${f.fournisseur}`,
-        debit: Math.round(f.tva * 100) / 100,
-        credit: 0,
-      });
+      lignes.push({ compte: compteTVABase, libelle: `TVA déductible ${f.taux_tva || 20}% - ${f.fournisseur}`, debit: Math.round(f.tva * 100) / 100, credit: 0 });
     }
+
     lignes.push({
-      compte: config.compteFournisseur,
+      compte: fecMatch?.compteAux || compteFournisseurBase,
+      compteAux: fecMatch?.compteAuxNum || null,
       libelle: `${f.fournisseur} - Facture ${piece}`,
       debit: 0,
       credit: Math.round(f.montant_ttc * 100) / 100,
@@ -908,14 +887,11 @@ function genererEcritures(factures, planComptable, entityType, fecData) {
       date: f.date || new Date().toISOString().split("T")[0],
       piece, fournisseur: f.fournisseur,
       montantTTC: Math.round(f.montant_ttc * 100) / 100,
-      journal: config.defaultJournal,
+      journal: journalAchat,
       lignes: lignesFinales,
-      status: "validée",
-      entityType,
-      fecMatch: !!fecMatch,
-      fecMatchNom: fecMatch?.nomOriginal,
-      equilibre,
-      ecartAvantCorrection: ecart,
+      status: "validée", entityType,
+      fecMatch: !!fecMatch, fecMatchNom: fecMatch?.nomOriginal,
+      equilibre, ecartAvantCorrection: ecart, compteLength,
     };
   });
 }
@@ -937,6 +913,16 @@ function FecView({ fecData, setFecData }) {
         totalFournisseurs: parsed.filter(f => f.nomOriginal).length,
         avecCompte: parsed.filter(f => f.compteCharge).length,
         lignesTotal: text.split("\n").length - 1,
+        compteLength: parsed._compteLength || 6,
+        // Infos structure
+        sep: parsed._structure?.sep || "|",
+        formatDate: parsed._structure?.formatDate || "YYYYMMDD",
+        journalAchatDetecte: parsed._structure?.journalAchatDetecte || "ACH",
+        aCompteAux: parsed._structure?.aCompteAux || false,
+        modeMontant: parsed._structure?.modeMontant || false,
+        journaux: parsed._structure?.journaux || {},
+        compteFournisseurPrincipal: parsed._structure?.compteFournisseurPrincipal || null,
+        compteTVAPrincipal: parsed._structure?.compteTVAPrincipal || null,
       });
     };
     reader.readAsText(file, "utf-8");
@@ -978,11 +964,11 @@ function FecView({ fecData, setFecData }) {
         </div>
       ) : (
         <>
-          <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
             {[
-              { label: "Fournisseurs détectés", value: stats?.totalFournisseurs || fecData.length, color: palette.orange },
-              { label: "Avec compte charge", value: stats?.avecCompte || fecData.filter(f => f.compteCharge).length, color: palette.accent },
-              { label: "Lignes FEC", value: stats?.lignesTotal || "—", color: palette.textMuted },
+              { label: "Fournisseurs", value: stats?.totalFournisseurs || fecData.length, color: palette.orange },
+              { label: "Avec compte", value: stats?.avecCompte || fecData.filter(f => f.compteCharge).length, color: palette.accent },
+              { label: "Format comptes", value: `${stats?.compteLength || fecData._compteLength || 6} chiffres`, color: palette.blue },
             ].map((s, i) => (
               <div key={i} style={{ ...css.card, flex: 1, minWidth: 90, marginBottom: 0, padding: 14 }}>
                 <div style={{ fontSize: 10, color: palette.textDim, textTransform: "uppercase", letterSpacing: 1 }}>{s.label}</div>
@@ -990,6 +976,25 @@ function FecView({ fecData, setFecData }) {
               </div>
             ))}
           </div>
+
+          {/* Infos structure détectée */}
+          {stats && (
+            <div style={{ ...css.infoBox(palette.blue), marginBottom: 12 }}>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Structure détectée</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", fontSize: 11 }}>
+                <span>📋 Séparateur : <strong>{stats.sep === "\t" ? "Tabulation" : "Pipe (|)"}</strong></span>
+                <span>📅 Format date : <strong>{stats.formatDate}</strong></span>
+                <span>📒 Journal achat : <strong>{stats.journalAchatDetecte}</strong></span>
+                <span>🔢 Comptes aux : <strong>{stats.aCompteAux ? "Oui" : "Non"}</strong></span>
+                {stats.modeMontant && <span>💰 Mode : <strong>Montant + Sens</strong></span>}
+                {stats.compteFournisseurPrincipal && <span>401 : <strong>{stats.compteFournisseurPrincipal}</strong></span>}
+                {stats.compteTVAPrincipal && <span>TVA : <strong>{stats.compteTVAPrincipal}</strong></span>}
+                {Object.keys(stats.journaux || {}).length > 0 && (
+                  <span>Journaux : <strong>{Object.entries(stats.journaux).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([j,n])=>`${j}(${n})`).join(" · ")}</strong></span>
+                )}
+              </div>
+            </div>
+          )}
 
           <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
             <button style={{ ...css.btnSmall("orange"), flex: 1, justifyContent: "center" }} onClick={() => fecRef.current?.click()}>
@@ -1009,14 +1014,17 @@ function FecView({ fecData, setFecData }) {
               <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 4px", borderBottom: `1px solid ${palette.border}22` }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: palette.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.nomOriginal}</div>
-                  {f.compteAux && <div style={{ fontSize: 10, color: palette.textDim }}>Aux : {f.compteAux}</div>}
+                  <div style={{ fontSize: 10, color: palette.textDim, display: "flex", gap: 8, marginTop: 2 }}>
+                    {f.compteAux && <span>401 : {f.compteAux}</span>}
+                    {f.compteAuxNum && <span>Aux : {f.compteAuxNum}</span>}
+                    {f.journal && <span>Journal : {f.journal}</span>}
+                  </div>
                 </div>
                 <div style={{ flexShrink: 0, marginLeft: 8 }}>
-                  {f.compteCharge ? (
-                    <span style={css.tag}>{f.compteCharge}</span>
-                  ) : (
-                    <span style={{ fontSize: 11, color: palette.textDim }}>— compte non détecté</span>
-                  )}
+                  {f.compteCharge
+                    ? <span style={css.tag}>{f.compteCharge}</span>
+                    : <span style={{ fontSize: 11, color: palette.textDim }}>— non détecté</span>
+                  }
                 </div>
               </div>
             ))}
