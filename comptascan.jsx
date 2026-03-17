@@ -647,7 +647,7 @@ const css = {
   header: { padding: "20px 20px 0", display: "flex", alignItems: "center", justifyContent: "space-between" },
   logo: { display: "flex", alignItems: "center", gap: 10 },
   logoIcon: { width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg, ${palette.accent}, #2BA86E)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: palette.bg, boxShadow: `0 0 20px ${palette.accentGlow}` },
-  logoText: { fontSize: 20, fontWeight: 700, letterSpacing: -0.5, color: palette.white },
+  logoText: { fontSize: 15, fontWeight: 700, letterSpacing: -0.5, color: palette.white },
   entityToggle: { display: "flex", gap: 0, background: palette.surface, borderRadius: 12, padding: 3, border: `1px solid ${palette.border}`, margin: "16px 20px 0" },
   entityBtn: (active, type) => ({ flex: 1, padding: "10px 14px", borderRadius: 10, border: "none", background: active ? (type === "entreprise" ? palette.accentDim : palette.purpleDim) : "transparent", color: active ? (type === "entreprise" ? palette.accent : palette.purple) : palette.textMuted, fontSize: 13, fontWeight: 600, fontFamily: font, cursor: "pointer", transition: "all 0.25s", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }),
   nav: { display: "flex", gap: 4, background: palette.surface, borderRadius: 12, padding: 3, margin: "12px 20px 0" },
