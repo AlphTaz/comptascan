@@ -1316,13 +1316,20 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) 
         </div>
       )}
 
-      {images.length > 0 && (
-        <div style={{ marginTop: 18 }}>
-          <button style={css.btn("primary")} onClick={analyze} disabled={loading}>
-            {loading ? (<><div style={css.spinner} /> {loadingMsg}</>) : (<>{Icons.scan} Analyser {images.length} page{images.length > 1 ? "s" : ""}</>)}
-          </button>
-        </div>
-      )}
+      <div style={{ marginTop: 18 }}>
+        <button
+          style={{ ...css.btn("primary"), opacity: images.length === 0 ? 0.35 : 1, cursor: images.length === 0 ? "not-allowed" : "pointer" }}
+          onClick={analyze}
+          disabled={loading || images.length === 0}
+        >
+          {loading
+            ? (<><div style={css.spinner} /> {loadingMsg}</>)
+            : images.length === 0
+              ? (<>{Icons.scan} Importer des factures pour analyser</>)
+              : (<>{Icons.scan} Analyser {images.length} page{images.length > 1 ? "s" : ""}</>)
+          }
+        </button>
+      </div>
 
       {error && (
         <div style={{ ...css.card, marginTop: 14, borderColor: palette.danger, background: palette.dangerDim, color: palette.danger, fontSize: 13 }}>
