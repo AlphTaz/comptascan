@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { auth, signOut, PROXY_URL } from "./firebase.js";
 
 // ─── PLANS COMPTABLES COMPLETS (PCG) ───
 const PLAN_ENTREPRISE = [
@@ -896,7 +897,105 @@ function genererEcritures(factures, planComptable, entityType, fecData) {
   });
 }
 
-// ─── FEC VIEW ───
+// ─── VÉRIFICATION D'ÉQUILIBRE ───
+function verifierEquilibre(lignes) {
+  const totalDebit = lignes.reduce((s, l) => s + (l.debit || 0), 0);
+  const totalCredit = lignes.reduce((s, l) => s + (l.credit || 0), 0);
+  const ecart = Math.round((totalDebit - totalCredit) * 100) / 100;
+  if (Math.abs(ecart) < 0.01) return { equilibre: true, ecart: 0, lignes };
+  const lignesCorrigees = [...lignes];
+  const idxCharge = lignesCorrigees.findIndex(l => l.debit > 0);
+  if (idxCharge >= 0) {
+    lignesCorrigees[idxCharge] = {
+      ...lignesCorrigees[idxCharge],
+      debit: Math.round((lignesCorrigees[idxCharge].debit - ecart) * 100) / 100,
+    };
+  }
+  return { equilibre: false, ecart, lignes: lignesCorrigees };
+}
+
+// ─── AI ───
+
+async function extractInvoiceData(images, planComptable, entityType, fecData) {
+  const config = ENTITY_CONFIG[entityType];
+  const planSummary = planComptable.map((c) => `${c.compte} - ${c.libelle} (${c.type})`).join("\n");
+  const imageContents = images.map((img) => ({ type: "image", source: { type: "base64", media_type: img.type, data: img.data } }));
+
+  const tvaInstruction = config.tvaApplicable
+    ? `L'entité est ASSUJETTIE à la TVA. Extrais le montant HT, la TVA et le TTC. Si la TVA n'apparaît pas, essaie de la déduire (taux standard 20%, intermédiaire 10%, réduit 5.5%).`
+    : `L'entité est une ASSOCIATION généralement NON ASSUJETTIE à la TVA. Le montant TTC = montant total payé. Mets tva à 0 et montant_ht = montant_ttc SAUF si la facture montre explicitement une TVA récupérable.`;
+
+  const contextInstruction = entityType === "association"
+    ? `C'est la comptabilité d'une ASSOCIATION loi 1901. Utilise la terminologie associative (emplois/ressources, excédent/déficit).`
+    : `C'est la comptabilité d'une ENTREPRISE commerciale. Terminologie classique (charges/produits, bénéfice/perte).`;
+
+  const fecContext = fecData && fecData.length > 0
+    ? `\nFOURNISSEURS DÉJÀ COMPTABILISÉS (extrait du FEC) :\n${fecData.slice(0, 30).map(f => `- "${f.nomOriginal}" → compte charge: ${f.compteCharge || "?"}, compte aux: ${f.compteAux || "?"}`).join("\n")}\n\nSi le fournisseur de la facture correspond à un fournisseur du FEC, utilise IMPÉRATIVEMENT son compte_charge déjà utilisé.`
+    : "";
+
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Utilisateur non connecté");
+  const token = await currentUser.getIdToken();
+
+  const response = await fetch(PROXY_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      tool: "comptascan",
+      messages: [{
+        role: "user",
+        content: [
+          ...imageContents,
+          {
+            type: "text",
+            text: `Tu es un expert-comptable français. ${contextInstruction}
+
+Analyse cette/ces facture(s) et extrais les données pour générer les écritures comptables.
+
+${tvaInstruction}
+
+PLAN COMPTABLE DISPONIBLE :
+${planSummary}
+${fecContext}
+
+Réponds UNIQUEMENT avec un JSON valide (sans backticks, sans texte autour) :
+{
+  "factures": [
+    {
+      "fournisseur": "Nom du fournisseur",
+      "numero_facture": "N° de facture",
+      "date": "YYYY-MM-DD",
+      "montant_ht": 0.00,
+      "tva": 0.00,
+      "montant_ttc": 0.00,
+      "taux_tva": 20,
+      "description": "Description courte",
+      "compte_charge": "Numéro de compte le plus approprié",
+      "fec_match": true
+    }
+  ]
+}
+
+Si le fournisseur est reconnu dans le FEC, mets fec_match à true. Utilise les comptes du plan comptable fourni.`,
+          },
+        ],
+      }],
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || `Erreur proxy (${response.status})`);
+  }
+
+  const data = await response.json();
+  const text = data.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+  return JSON.parse(text.replace(/```json|```/g, "").trim());
+}
+
+
 function FecView({ fecData, setFecData }) {
   const fecRef = useRef();
   const [dragOver, setDragOver] = useState(false);
