@@ -1134,9 +1134,11 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) 
   const [error, setError] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  // Mode batch : chaque image est une facture distincte
+  // Mode groupé : toutes les images = une seule facture multi-pages
+  const [batchMode, setBatchMode] = useState(false);
 
   const convertPdfToImages = async (file) => {
-    // Chargement dynamique de pdfjs depuis CDN
     if (!window.pdfjsLib) {
       await new Promise((resolve, reject) => {
         const script = document.createElement("script");
@@ -1161,13 +1163,9 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) 
       await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
       const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
       pageImages.push({
-        id: crypto.randomUUID(),
-        name: `${file.name}_page${i}.jpg`,
-        data: dataUrl.split(",")[1],
-        type: "image/jpeg",
-        preview: dataUrl,
-        isPdfPage: true,
-        pageNum: i,
+        id: crypto.randomUUID(), name: `${file.name}_p${i}.jpg`,
+        data: dataUrl.split(",")[1], type: "image/jpeg", preview: dataUrl,
+        isPdfPage: true, pageNum: i, sourceFile: file.name,
       });
     }
     return pageImages;
@@ -1176,14 +1174,13 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) 
   const handleFiles = useCallback(async (files) => {
     for (const file of Array.from(files)) {
       if (file.type === "application/pdf") {
-        setLoadingMsg(`Conversion PDF en cours...`);
+        setLoadingMsg("Conversion PDF en cours...");
         setLoading(true);
         try {
           const pages = await convertPdfToImages(file);
-          setImages((prev) => [...prev, ...pages]);
-        } catch (e) {
-          setError("Erreur lecture PDF : " + e.message);
-        }
+          // En mode batch, chaque PDF = une facture (toutes ses pages groupées)
+          setImages((prev) => [...prev, ...pages.map(p => ({ ...p, batchGroup: file.name }))]);
+        } catch (e) { setError("Erreur lecture PDF : " + e.message); }
         setLoading(false);
         setLoadingMsg("Analyse en cours...");
       } else if (file.type.startsWith("image/")) {
@@ -1191,7 +1188,8 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) 
         reader.onload = (e) => {
           setImages((prev) => [...prev, {
             id: crypto.randomUUID(), name: file.name,
-            data: e.target.result.split(",")[1], type: file.type, preview: e.target.result,
+            data: e.target.result.split(",")[1], type: file.type,
+            preview: e.target.result, batchGroup: file.name,
           }]);
         };
         reader.readAsDataURL(file);
@@ -1199,22 +1197,36 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) 
     }
   }, []);
 
-  const handleCameraCapture = (file) => {
-    handleFiles([file]);
-    setShowCamera(false);
-  };
+  const handleCameraCapture = (file) => { handleFiles([file]); setShowCamera(false); };
 
   const analyze = async () => {
     if (!images.length) return;
     setLoading(true); setLoadingMsg("Analyse en cours..."); setError(null);
     try {
-      const result = await extractInvoiceData(images, planComptable, entityType, fecData);
-      const ecritures = genererEcritures(result.factures, planComptable, entityType, fecData);
-      onEcrituresGenerated(ecritures);
+      if (batchMode && images.length > 1) {
+        // Mode batch : analyser chaque groupe séparément
+        const groups = images.reduce((acc, img) => {
+          const key = img.batchGroup || img.id;
+          if (!acc[key]) acc[key] = [];
+          acc[key].push(img);
+          return acc;
+        }, {});
+        const allEcritures = [];
+        const keys = Object.keys(groups);
+        for (let i = 0; i < keys.length; i++) {
+          setLoadingMsg(`Analyse facture ${i + 1}/${keys.length}...`);
+          const result = await extractInvoiceData(groups[keys[i]], planComptable, entityType, fecData);
+          const ecritures = genererEcritures(result.factures, planComptable, entityType, fecData);
+          allEcritures.push(...ecritures);
+        }
+        onEcrituresGenerated(allEcritures);
+      } else {
+        const result = await extractInvoiceData(images, planComptable, entityType, fecData);
+        const ecritures = genererEcritures(result.factures, planComptable, entityType, fecData);
+        onEcrituresGenerated(ecritures);
+      }
       setImages([]);
-    } catch (e) {
-      setError("Erreur lors de l'analyse : " + e.message);
-    }
+    } catch (e) { setError("Erreur lors de l'analyse : " + e.message); }
     setLoading(false);
   };
 
@@ -1266,7 +1278,23 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) 
         <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf" multiple style={{ display: "none" }} onChange={(e) => handleFiles(e.target.files)} />
       </label>
 
-      {images.length > 0 && (
+      {/* Toggle mode batch */}
+      {images.length > 1 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 10, border: `1px solid ${batchMode ? palette.accent : palette.border}`, background: batchMode ? palette.accentDim : palette.surface, marginBottom: 14, cursor: "pointer" }}
+          onClick={() => setBatchMode(b => !b)}>
+          <div style={{ width: 36, height: 20, borderRadius: 10, background: batchMode ? palette.accent : palette.border, position: "relative", flexShrink: 0, transition: "background 0.2s" }}>
+            <div style={{ position: "absolute", top: 2, left: batchMode ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: palette.white, transition: "left 0.2s" }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: batchMode ? palette.accent : palette.text }}>
+              Mode lot — {images.length} factures distinctes
+            </div>
+            <div style={{ fontSize: 11, color: palette.textDim, marginTop: 2 }}>
+              {batchMode ? "Chaque fichier = une écriture séparée" : "Tous les fichiers = une seule facture multi-pages"}
+            </div>
+          </div>
+        </div>
+      )}
         <>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
             {images.map((img, i) => (
@@ -1355,6 +1383,7 @@ function EcrituresView({ ecritures, entityType, onDelete }) {
                   <span style={css.badge(palette.accent)}>{e.journal}</span>
                   {e.entityType === "association" && <span style={css.badge(palette.purple)}>ASSO</span>}
                   {e.fecMatch && <span style={css.badge(palette.orange)}>FEC ✓</span>}
+                  {!e.fecMatch && <span style={{ ...css.badge(palette.blue), border: `1px dashed ${palette.blue}` }}>✦ Nouveau</span>}
                 </div>
               </div>
             </div>
@@ -1565,6 +1594,18 @@ export default function ComptaScan({ user, onHome }) {
     { id: "plan", label: "Plan" },
   ];
 
+  // Icônes nav
+  const IconHome = () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/>
+    </svg>
+  );
+  const IconLogout = () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+    </svg>
+  );
+
   return (
     <div style={css.app}>
       <style>{`
@@ -1579,26 +1620,50 @@ export default function ComptaScan({ user, onHome }) {
         input:focus, select:focus { border-color: ${palette.accent} !important; }
         button:hover { opacity: 0.85; }
         button:active { transform: scale(0.97); }
+        .logo-text { display: block; }
+        @media (max-width: 360px) { .logo-text { display: none; } }
       `}</style>
 
-      <div style={css.header}>
+      {/* ── HEADER ── */}
+      <div style={{ ...css.header, padding: "16px 20px" }}>
+        {/* Logo */}
         <div style={css.logo}>
           <div style={css.logoIcon}>C</div>
-          <div style={css.logoText}>ComptaScan</div>
+          <div className="logo-text" style={css.logoText}>ComptaScan</div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+
+        {/* Actions droite */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {fecData.length > 0 && (
-            <div style={{ fontSize: 11, color: palette.orange, background: palette.orangeDim, padding: "4px 10px", borderRadius: 20, fontWeight: 600 }}>
-              FEC actif
+            <div style={{ fontSize: 10, color: palette.orange, background: palette.orangeDim, padding: "3px 8px", borderRadius: 20, fontWeight: 700, letterSpacing: 0.3 }}>
+              FEC
             </div>
           )}
+
+          {/* Bouton Accueil */}
           {onHome && (
-            <button onClick={onHome} style={{ padding: "4px 10px", borderRadius: 20, border: `1px solid ${palette.border}`, background: "transparent", color: palette.textDim, fontSize: 11, fontWeight: 600, fontFamily: font, cursor: "pointer" }}>
-              ⌂
+            <button
+              onClick={onHome}
+              title="Accueil"
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: `1px solid ${palette.border}`, background: palette.surface, color: palette.textMuted, fontSize: 12, fontWeight: 600, fontFamily: font, cursor: "pointer", transition: "all 0.2s" }}
+              onMouseOver={e => { e.currentTarget.style.borderColor = palette.borderLight; e.currentTarget.style.color = palette.text; }}
+              onMouseOut={e => { e.currentTarget.style.borderColor = palette.border; e.currentTarget.style.color = palette.textMuted; }}
+            >
+              <IconHome />
+              <span className="logo-text">Accueil</span>
             </button>
           )}
-          <button onClick={() => signOut(auth)} title={user?.email || "Déconnexion"} style={{ padding: "4px 10px", borderRadius: 20, border: `1px solid ${palette.border}`, background: "transparent", color: palette.textDim, fontSize: 11, fontWeight: 600, fontFamily: font, cursor: "pointer" }}>
-            ⎋ Déco
+
+          {/* Bouton Déconnexion */}
+          <button
+            onClick={() => signOut(auth)}
+            title={`Déconnexion (${user?.email || ""})`}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: `1px solid ${palette.dangerDim}`, background: palette.dangerDim, color: palette.danger, fontSize: 12, fontWeight: 600, fontFamily: font, cursor: "pointer", transition: "all 0.2s" }}
+            onMouseOver={e => e.currentTarget.style.background = "rgba(248,113,113,0.18)"}
+            onMouseOut={e => e.currentTarget.style.background = palette.dangerDim}
+          >
+            <IconLogout />
+            <span className="logo-text">Quitter</span>
           </button>
         </div>
       </div>
