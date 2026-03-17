@@ -1295,6 +1295,7 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) 
           </div>
         </div>
       )}
+      {images.length > 0 && (
         <>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
             {images.map((img, i) => (
