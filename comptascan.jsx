@@ -1532,7 +1532,7 @@ function PlanComptableView({ planComptable, setPlanComptable, entityType }) {
 }
 
 // ─── APP ───
-export default function ComptaScan({ user }) {
+export default function ComptaScan({ user, onHome }) {
   const [entityType, setEntityType] = useState("entreprise");
   const [tab, setTab] = useState("scan");
   const [ecritures, setEcritures] = useState([]);
@@ -1592,11 +1592,12 @@ export default function ComptaScan({ user }) {
               FEC actif
             </div>
           )}
-          <button
-            onClick={() => signOut(auth)}
-            title={user?.email || "Déconnexion"}
-            style={{ padding: "4px 10px", borderRadius: 20, border: `1px solid ${palette.border}`, background: "transparent", color: palette.textDim, fontSize: 11, fontWeight: 600, fontFamily: font, cursor: "pointer" }}
-          >
+          {onHome && (
+            <button onClick={onHome} style={{ padding: "4px 10px", borderRadius: 20, border: `1px solid ${palette.border}`, background: "transparent", color: palette.textDim, fontSize: 11, fontWeight: 600, fontFamily: font, cursor: "pointer" }}>
+              ⌂
+            </button>
+          )}
+          <button onClick={() => signOut(auth)} title={user?.email || "Déconnexion"} style={{ padding: "4px 10px", borderRadius: 20, border: `1px solid ${palette.border}`, background: "transparent", color: palette.textDim, fontSize: 11, fontWeight: 600, fontFamily: font, cursor: "pointer" }}>
             ⎋ Déco
           </button>
         </div>
