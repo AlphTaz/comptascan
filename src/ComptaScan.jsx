@@ -882,7 +882,7 @@ function genererEcritures(factures, planComptable, entityType, fecData) {
 
     const lignes = [{
       compte: compteCharge,
-      libelle: `${f.fournisseur} - ${f.description || libelleCharge}`,
+      libelle: `${f.fournisseur} - ${f.description || libelleCharge}- ${piece}`,
       debit: Math.round((config.tvaApplicable ? f.montant_ht : f.montant_ttc) * 100) / 100,
       credit: 0,
     }];
