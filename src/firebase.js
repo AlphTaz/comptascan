@@ -11,10 +11,10 @@ const firebaseConfig = {
   apiKey: "AIzaSyBw0C9oLrIFG73VTqLuoFw3xGkBaknScl8",
   authDomain: "finaia-94f65.firebaseapp.com",
   projectId: "finaia-94f65",
-  storageBucket: "finaia-94f65.appspot.com",
+  storageBucket: "finaia-94f65.firebasestorage.app",
   messagingSenderId: "679838711631",
   appId: "1:679838711631:web:34c6fa194a4844cf4a4f3a",
-  measurementId: "G-SWYD4FSZNN",
+  measurementId: "G-SWYD4FSZNN"
 };
 
 const app = initializeApp(firebaseConfig);
