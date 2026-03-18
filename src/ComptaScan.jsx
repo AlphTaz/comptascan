@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { auth, PROXY_URL } from "./firebase.js";
 
 // ─── PLANS COMPTABLES ───
 const PLAN_ENTREPRISE = [
@@ -155,16 +156,25 @@ function genererEcritures(factures, planComptable, entityType) {
 async function extractInvoiceData(images, planComptable, entityType) {
   const cfg = ENTITY_CONFIG[entityType];
   const planSummary = planComptable.map(c=>`${c.compte} - ${c.libelle} (${c.type})`).join("\n");
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000,
+
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Utilisateur non connecté");
+  const token = await currentUser.getIdToken();
+
+  const response = await fetch(PROXY_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      tool: "comptascan",
       messages: [{ role: "user", content: [
         ...images.map(img => ({ type:"image", source:{ type:"base64", media_type:img.type, data:img.data } })),
         { type:"text", text:`Expert-comptable français. ${entityType==="association"?"ASSOCIATION 1901":"ENTREPRISE"}. ${cfg.tvaApplicable?"Extrais HT+TVA+TTC. Taxes DOM (OM/OMR) dans taxes[].":"tva=0, montant_ht=montant_ttc sauf TVA explicite."}\n\nPLAN:\n${planSummary}\n\nJSON uniquement:\n{"factures":[{"fournisseur":"","numero_facture":"","date":"YYYY-MM-DD","montant_ht":0,"tva":0,"taux_tva":20,"montant_ttc":0,"description":"","compte_charge":"","taxes":[]}]}` }
       ]}]
     }),
   });
-  if (!response.ok) { const e = await response.json().catch(()=>({})); throw new Error(e.error?.message||`Erreur API (${response.status})`); }
+  if (!response.ok) { const e = await response.json().catch(()=>({})); throw new Error(e.error || `Erreur proxy (${response.status})`); }
   const data = await response.json();
   return JSON.parse(data.content.filter(b=>b.type==="text").map(b=>b.text).join("").replace(/```json|```/g,"").trim());
 }
