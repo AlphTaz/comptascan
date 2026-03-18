@@ -514,18 +514,69 @@ function EcritureModal({ ecriture, planComptable, onAddCompte, onSave, onClose }
 function ScanView({ planComptable, entityType, onEcrituresGenerated }) {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState("Analyse IA...");
   const [error, setError] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
 
-  const handleFiles = useCallback(async files => {
+  // ── Conversion PDF → images via PDF.js (chargé dynamiquement) ──
+  const convertPdfToImages = async (file) => {
+    if (!window.pdfjsLib) {
+      await new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+        script.onload = resolve;
+        script.onerror = () => reject(new Error("Impossible de charger PDF.js"));
+        document.head.appendChild(script);
+      });
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pageImages = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 2.0 });
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+      pageImages.push({
+        id: crypto.randomUUID(),
+        name: `${file.name} — p.${i}`,
+        data: dataUrl.split(",")[1],
+        type: "image/jpeg",
+        preview: dataUrl,
+        isPdf: true,
+        pageNum: i,
+        totalPages: pdf.numPages,
+        sourceFile: file.name,
+      });
+    }
+    return pageImages;
+  };
+
+  const handleFiles = useCallback(async (files) => {
     for (const f of Array.from(files)) {
-      if (f.type.startsWith("image/")) {
+      if (f.type === "application/pdf") {
+        setLoadingMsg(`Conversion PDF "${f.name}"…`);
+        setLoading(true);
+        try {
+          const pages = await convertPdfToImages(f);
+          setImages(prev => [...prev, ...pages]);
+        } catch(e) {
+          setError("Erreur PDF : " + e.message);
+        }
+        setLoading(false);
+        setLoadingMsg("Analyse IA...");
+      } else if (f.type.startsWith("image/")) {
         const reader = new FileReader();
-        reader.onload = e => setImages(prev=>[...prev,{
+        reader.onload = ev => setImages(prev => [...prev, {
           id: crypto.randomUUID(), name: f.name,
-          data: e.target.result.split(",")[1], type: f.type, preview: e.target.result
+          data: ev.target.result.split(",")[1], type: f.type, preview: ev.target.result,
         }]);
         reader.readAsDataURL(f);
       }
@@ -592,7 +643,7 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated }) {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/jpeg,image/jpg,image/png,image/webp"
+        accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
         multiple
         style={{ display:"none" }}
         onChange={e => { handleFiles(e.target.files); e.target.value=""; }}
@@ -616,7 +667,7 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated }) {
         onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
       >
         <div style={{ fontSize:12, color:p.textDim, marginBottom:3 }}>Ou glisser-déposer ici</div>
-        <div style={{ fontSize:11, color:p.textDim }}>JPG · PNG · WEBP</div>
+        <div style={{ fontSize:11, color:p.textDim }}>JPG · PNG · WEBP · <span style={{ color:p.orange }}>PDF</span></div>
       </div>
 
       {/* Miniatures des images chargées */}
@@ -625,6 +676,12 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated }) {
           {images.map(img => (
             <div key={img.id} style={{ position:"relative", width:66, height:66, borderRadius:8, overflow:"hidden", border:`1px solid ${p.border}` }}>
               <img src={img.preview} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+              {/* Badge page PDF */}
+              {img.isPdf && (
+                <div style={{ position:"absolute", bottom:0, left:0, right:0, background:"rgba(251,146,60,0.85)", fontSize:9, fontWeight:700, color:"#fff", textAlign:"center", padding:"2px 0", fontFamily:mono }}>
+                  p.{img.pageNum}/{img.totalPages}
+                </div>
+              )}
               <div
                 style={{ position:"absolute", top:2, right:2, background:"rgba(0,0,0,0.75)", borderRadius:4, padding:"2px 4px", cursor:"pointer", display:"flex" }}
                 onClick={() => setImages(prev => prev.filter(x => x.id !== img.id))}
@@ -650,8 +707,8 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated }) {
         disabled={loading || images.length===0}
       >
         {loading
-          ? <><div style={s.spinner}/> Analyse IA...</>
-          : <>{Icon.scan} Analyser {images.length > 0 ? `${images.length} image(s)` : "des factures"}</>
+          ? <><div style={s.spinner}/> {loadingMsg}</>
+          : <>{Icon.scan} Analyser {images.length > 0 ? `${images.length} page(s)` : "des factures"}</>
         }
       </button>
 
