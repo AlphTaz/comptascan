@@ -2052,6 +2052,11 @@ export default function ComptaScan({ user, onHome }) {
 
         {/* Actions droite */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {/* Tarifs */}
+          <a href="tarifs-comptascan.html" style={{ fontSize: 10, color: palette.accent, background: palette.accentDim, padding: "3px 10px", borderRadius: 20, fontWeight: 700, letterSpacing: 0.3, textDecoration: "none", border: `1px solid ${palette.accent}33` }}>
+            Tarifs
+          </a>
+
           {fecData.length > 0 && (
             <div style={{ fontSize: 10, color: palette.orange, background: palette.orangeDim, padding: "3px 8px", borderRadius: 20, fontWeight: 700, letterSpacing: 0.3 }}>
               FEC
