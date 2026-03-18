@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%233ECF8E'/><text x='16' y='22' font-size='13' font-weight='bold' fill='white' text-anchor='middle' font-family='sans-serif'>C</text></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ComptaScan — Tarifs</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,700;1,9..144,900&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#05040b;--s1:#0b0918;--s2:#111024;--s3:#191630;
+  --bd:#221f40;--bd2:#302c54;
+  --lav:#3ECF8E;--lav2:#6EE7B7;--vio:#2BA86E;
+  --wh:#f3efff;--off:#bab4d4;--dim:#6a637f;--fog:#35305a;
+  --ok:#22c55e;--ok2:#86efac;--warn:#f59e0b;
+}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--wh);min-height:100vh;overflow-x:hidden;}
+::selection{background:rgba(167,139,250,.25);}
+::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;opacity:.032;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");background-size:300px;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(124,92,252,.08) 0%,transparent 60%);}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;align-items:center;padding:0 56px;
+  background:rgba(5,4,11,.8);backdrop-filter:blur(24px);border-bottom:1px solid rgba(48,44,84,.5);}
+.n-logo{display:flex;align-items:center;gap:10px;text-decoration:none;}
+.n-mark{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--vio),var(--lav));
+  display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:900;color:#fff;box-shadow:0 0 18px rgba(124,92,252,.4);}
+.n-name{font-family:'Fraunces',serif;font-size:18px;font-weight:700;letter-spacing:-.3px;color:var(--wh);}
+.n-name i{font-style:italic;font-weight:300;color:var(--lav);}
+.n-spacer{flex:1;}
+.n-links{display:flex;align-items:center;gap:2px;}
+.n-a{padding:6px 14px;border-radius:99px;font-size:13px;color:var(--dim);text-decoration:none;transition:color .18s;}.n-a:hover{color:var(--off);}
+.n-cta{padding:7px 18px;border-radius:99px;font-size:13px;font-weight:500;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.28);color:var(--lav2);text-decoration:none;transition:all .18s;margin-left:6px;}.n-cta:hover{background:rgba(167,139,250,.18);}
+.n-auth{padding:7px 16px;border-radius:99px;font-size:13px;font-weight:500;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--off);text-decoration:none;transition:all .18s;margin-left:4px;}
+.n-auth:hover{background:rgba(255,255,255,.1);color:var(--wh);}
+@media(max-width:700px){nav{padding:0 20px;}.n-a{display:none;}}
+
+/* HERO */
+.pricing-hero{padding:120px 56px 60px;max-width:1380px;margin:0 auto;text-align:center;position:relative;z-index:1;}
+@media(max-width:700px){.pricing-hero{padding:100px 20px 40px;}}
+.ph-chip{display:inline-flex;align-items:center;gap:8px;padding:5px 14px;border-radius:99px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.2);
+  font-family:'DM Mono',monospace;font-size:11px;color:var(--lav2);letter-spacing:.09em;text-transform:uppercase;margin-bottom:28px;}
+.ph-chip-dot{width:6px;height:6px;border-radius:50%;background:var(--lav);box-shadow:0 0 8px var(--lav);}
+.ph-title{font-family:'Fraunces',serif;font-size:clamp(40px,5.5vw,72px);font-weight:900;letter-spacing:-2.5px;line-height:.94;margin-bottom:20px;}
+.ph-title i{font-style:italic;font-weight:300;color:var(--lav2);}
+.ph-sub{font-size:16px;color:var(--off);line-height:1.7;max-width:520px;margin:0 auto 12px;}
+.ph-note{font-family:'DM Mono',monospace;font-size:13px;color:var(--fog);margin-bottom:0;}
+
+/* PRICING GRID */
+.pricing-section{position:relative;z-index:1;padding:40px 56px 100px;max-width:1380px;margin:0 auto;}
+@media(max-width:700px){.pricing-section{padding:20px 16px 80px;}}
+
+.pricing-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;align-items:stretch;}
+@media(max-width:1100px){.pricing-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:620px){.pricing-grid{grid-template-columns:1fr;}}
+
+.plan{background:var(--s1);border:1px solid var(--bd);border-radius:20px;padding:36px 30px 32px;display:flex;flex-direction:column;
+  transition:transform .3s,border-color .3s,box-shadow .3s;position:relative;overflow:hidden;}
+.plan:hover{transform:translateY(-4px);border-color:rgba(167,139,250,.3);box-shadow:0 20px 50px rgba(0,0,0,.4);}
+.plan.pop{border-color:rgba(124,92,252,.4);box-shadow:0 0 0 1px rgba(124,92,252,.15),0 24px 60px rgba(0,0,0,.4);}
+.plan.pop::before{content:'';position:absolute;inset:0;border-radius:20px;background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(124,92,252,.08),transparent);pointer-events:none;}
+
+.plan-pop-tag{position:absolute;top:16px;right:16px;padding:3px 10px;border-radius:6px;font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:.06em;text-transform:uppercase;background:linear-gradient(135deg,var(--vio),var(--lav));color:#fff;font-weight:500;}
+
+.plan-name{font-family:'Fraunces',serif;font-size:22px;font-weight:900;letter-spacing:-.3px;margin-bottom:4px;}
+.plan-desc{font-size:13px;color:var(--dim);line-height:1.5;margin-bottom:20px;min-height:52px;}
+
+.plan-price{display:flex;align-items:baseline;gap:4px;margin-bottom:4px;min-height:48px;}
+.plan-amount{font-family:'Fraunces',serif;font-size:42px;font-weight:900;letter-spacing:-2px;line-height:1;}
+.plan-amount.free{font-size:36px;color:var(--ok2);}
+.plan-per{font-size:13px;color:var(--dim);}
+.plan-billed{font-family:'DM Mono',monospace;font-size:10px;color:var(--fog);margin-bottom:24px;min-height:14px;}
+
+.plan-tokens{display:flex;align-items:center;gap:8px;padding:12px 16px;border-radius:10px;background:var(--s2);border:1px solid var(--bd);margin-bottom:24px;min-height:56px;}
+.plan-tokens-n{font-family:'Fraunces',serif;font-size:24px;font-weight:900;color:var(--lav2);}
+.plan-tokens-n.inf{font-size:20px;color:var(--ok2);}
+.plan-tokens-l{font-size:12px;color:var(--dim);line-height:1.4;}
+
+.plan-features{display:flex;flex-direction:column;gap:8px;margin-bottom:28px;flex:1;}
+.plan-feat{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:var(--off);line-height:1.45;}
+.plan-check{width:16px;height:16px;border-radius:4px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:8px;
+  background:rgba(167,139,250,.1);color:var(--lav);}
+.plan.pop .plan-check{background:rgba(43,168,110,.15);color:var(--lav2);}
+
+.plan-cta{display:block;text-align:center;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:500;text-decoration:none;transition:all .22s;}
+.plan-cta.ghost{background:transparent;border:1px solid var(--bd2);color:var(--off);}.plan-cta.ghost:hover{border-color:var(--lav);color:var(--lav2);}
+.plan-cta.primary{background:linear-gradient(135deg,var(--vio),var(--lav));color:#fff;box-shadow:0 4px 18px rgba(124,92,252,.3);}.plan-cta.primary:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(124,92,252,.45);}
+.plan-cta.green{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:var(--ok2);}.plan-cta.green:hover{background:rgba(34,197,94,.2);}
+
+/* FAQ */
+.faq{position:relative;z-index:1;padding:0 56px 80px;max-width:900px;margin:0 auto;}
+@media(max-width:700px){.faq{padding:0 20px 60px;}}
+.faq-title{font-family:'Fraunces',serif;font-size:clamp(28px,3.5vw,42px);font-weight:900;letter-spacing:-1px;text-align:center;margin-bottom:40px;}
+.faq-title i{font-style:italic;font-weight:300;color:var(--lav2);}
+.faq-item{border:1px solid var(--bd);border-radius:14px;margin-bottom:10px;overflow:hidden;background:var(--s1);transition:border-color .2s;}
+.faq-item:hover{border-color:var(--bd2);}
+.faq-q{padding:18px 22px;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;}
+.faq-q::after{content:'›';font-size:18px;color:var(--dim);transition:transform .2s;}
+.faq-item.open .faq-q::after{transform:rotate(90deg);color:var(--lav);}
+.faq-a{padding:0 22px;max-height:0;overflow:hidden;transition:max-height .3s,padding .3s;font-size:13px;color:var(--dim);line-height:1.7;}
+.faq-item.open .faq-a{max-height:300px;padding:0 22px 18px;}
+
+/* FOOTER */
+footer{position:relative;z-index:1;border-top:1px solid var(--bd);padding:24px 56px;display:flex;align-items:center;gap:14px;font-family:'DM Mono',monospace;font-size:11px;color:var(--fog);}
+@media(max-width:700px){footer{padding:20px;flex-direction:column;text-align:center;gap:6px;}}
+.f-brand{font-family:'Fraunces',serif;font-size:14px;font-weight:700;background:linear-gradient(90deg,var(--lav),var(--vio));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-right:auto;}
+footer a{color:var(--lav);text-decoration:none;}
+
+/* ═══ LOGOUT MODAL ═══ */
+.logout-overlay{position:fixed;inset:0;z-index:9000;background:rgba(5,4,11,.7);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .25s,visibility .25s;}
+.logout-overlay.show{opacity:1;visibility:visible;pointer-events:auto;}
+.logout-modal{background:var(--s1);border:1px solid var(--bd2);border-radius:18px;padding:36px 32px;max-width:340px;width:90%;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.6);transform:scale(.95);transition:transform .25s;}
+.logout-overlay.show .logout-modal{transform:scale(1);}
+.logout-modal-icon{width:48px;height:48px;border-radius:12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:20px;}
+.logout-modal-title{font-family:'Fraunces',serif;font-size:18px;font-weight:700;margin-bottom:6px;}
+.logout-modal-text{font-size:13px;color:var(--dim);margin-bottom:24px;line-height:1.5;}
+.logout-modal-actions{display:flex;gap:10px;}
+.logout-modal-btn{flex:1;padding:11px;border-radius:10px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .18s;border:none;}
+.logout-modal-btn.cancel{background:var(--s2);border:1px solid var(--bd);color:var(--off);}
+.logout-modal-btn.cancel:hover{border-color:var(--bd2);color:var(--wh);}
+.logout-modal-btn.confirm{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);color:#f87171;}
+.logout-modal-btn.confirm:hover{background:rgba(239,68,68,.2);}
+</style>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyBw0C9oLrIFG73VTqLuoFw3xGkBaknScl8",
+  authDomain: "finaia-94f65.firebaseapp.com",
+  projectId: "finaia-94f65",
+  storageBucket: "finaia-94f65.firebasestorage.app",
+  messagingSenderId: "679838711631",
+  appId: "1:679838711631:web:34c6fa194a4844cf4a4f3a"
+});
+</script>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="https://alphtaz.github.io/comptascan" class="n-logo">
+    <div class="n-mark" style="background:linear-gradient(135deg,#2BA86E,#3ECF8E)">C</div>
+    <div class="n-name">Compta<i>Scan</i></div>
+  </a>
+  <div class="n-spacer"></div>
+  <div class="n-links">
+    <a href="https://alphtaz.github.io/comptascan" class="n-a">Retour ComptaScan</a>
+    <a href="#" class="n-a" style="color:var(--lav2)">Tarifs</a>
+    <a href="https://finaia.web.app/contact.html" class="n-a">Contact</a>
+    <span id="nav-auth-area">
+      <a href="https://finaia.web.app/dashboard.html" class="n-cta" style="padding:6px 14px;background:linear-gradient(135deg,rgba(43,168,110,.15),rgba(62,207,142,.08));border-color:rgba(62,207,142,.3);color:#6EE7B7">Essai gratuit →</a>
+      <a href="https://finaia.web.app/dashboard.html" class="n-auth">Se connecter</a>
+    </span>
+    <span id="nav-user-area" style="display:none;align-items:center;gap:8px">
+      <a href="dashboard.html" style="display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:99px;font-family:'DM Mono',monospace;font-size:11px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:var(--off);text-decoration:none;max-width:170px;overflow:hidden">
+        <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;box-shadow:0 0 6px #22c55e;flex-shrink:0"></span>
+        <span id="nav-user-email" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      </a>
+      <a href="https://finaia.web.app/dashboard.html" class="n-cta" style="padding:6px 14px">Mon espace</a>
+      <button onclick="showLogoutModal()" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,.08);color:var(--dim);cursor:pointer;transition:all .18s" onmouseover="this.style.borderColor='rgba(239,68,68,.3)';this.style.color='#f87171'" onmouseout="this.style.borderColor='rgba(255,255,255,.08)';this.style.color='var(--dim)'" title="Déconnexion">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </span>
+  </div>
+</nav>
+
+<!-- LOGOUT MODAL -->
+<div class="logout-overlay" id="logout-overlay" onclick="if(event.target===this)hideLogoutModal()">
+  <div class="logout-modal">
+    <div class="logout-modal-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    </div>
+    <div class="logout-modal-title">Déconnexion</div>
+    <div class="logout-modal-text">Voulez-vous vous déconnecter ?</div>
+    <div class="logout-modal-actions">
+      <button class="logout-modal-btn cancel" onclick="hideLogoutModal()">Annuler</button>
+      <button class="logout-modal-btn confirm" onclick="firebase.auth().signOut();hideLogoutModal()">Se déconnecter</button>
+    </div>
+  </div>
+</div>
+
+<!-- HERO -->
+<div class="pricing-hero">
+  <div class="ph-chip"><div class="ph-chip-dot" style="background:#3ECF8E;box-shadow:0 0 8px #3ECF8E"></div>Compte partagé Finaïa · Mêmes tokens</div>
+  <h1 class="ph-title">Compta<i>Scan</i> — Tarifs</h1>
+  <p class="ph-sub">ComptaScan est inclus dans votre abonnement Finaïa. Photographiez vos factures, générez vos écritures comptables en un scan — même compte, mêmes tokens.</p>
+  <p class="ph-note">1 token = 1 analyse IA · Essai gratuit · Sans engagement · Annulable à tout moment</p>
+</div>
+
+<!-- PRICING -->
+<div class="pricing-section">
+  <div class="pricing-grid">
+
+    <!-- ESSAI GRATUIT -->
+    <div class="plan">
+      <div class="plan-name">Essai</div>
+      <div class="plan-desc">Explorez la puissance des outils Finaïa gratuitement. Testez tous les outils sans engagement.</div>
+      <div class="plan-price">
+        <div class="plan-amount free">Gratuit</div>
+      </div>
+      <div class="plan-billed" style="display:flex;align-items:center;padding:0"><div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--bd2),rgba(34,197,94,.4),var(--bd2),transparent)"></div></div>
+      <div class="plan-tokens">
+        <div class="plan-tokens-n">10</div>
+        <div class="plan-tokens-l">tokens offerts<br>à l'inscription</div>
+      </div>
+      <div class="plan-features">
+        <div class="plan-feat"><div class="plan-check">✓</div>Tous les outils <a href="https://finaia.web.app" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(62,207,142,.4)">Finaïa</a> Association (CRC 99-01)</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>Tous les outils <a href="https://finaia.web.app" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(62,207,142,.4)">Finaïa</a> Entreprise (PCG)</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>Tous les territoires (Métropole + DOM)</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>Export CSV</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>ComptaScan — scan de factures IA</div>
+      </div>
+      <a href="#" class="plan-cta green" id="free-plan-cta" onclick="handlePlan('free');return false">Créer mon compte →</a>
+    </div>
+
+    <!-- STARTER -->
+    <div class="plan">
+      <div class="plan-name">Starter</div>
+      <div class="plan-desc">Pour les petites structures — trésorier bénévole, micro-association, auto-entrepreneur.</div>
+      <div class="plan-price">
+        <div class="plan-amount">29€</div>
+        <div class="plan-per">/ mois</div>
+      </div>
+      <div class="plan-billed" style="display:flex;align-items:center;gap:0;padding:0"><div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--bd2),rgba(167,139,250,.3),var(--bd2),transparent)"></div></div>
+      <div class="plan-tokens">
+        <div class="plan-tokens-n">50</div>
+        <div class="plan-tokens-l">tokens<br>par mois</div>
+      </div>
+      <div class="plan-features">
+        <div class="plan-feat"><div class="plan-check">✓</div>Tous les outils <a href="https://finaia.web.app" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(62,207,142,.4)">Finaïa</a> de l'Essai</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>50 analyses IA / mois</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>Historique des analyses</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>Support email</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>ComptaScan — scan de factures IA</div>
+      </div>
+      <a href="#" class="plan-cta ghost" onclick="handlePlan('starter');return false">Choisir Starter →</a>
+    </div>
+
+    <!-- PRO (populaire) -->
+    <div class="plan pop">
+      <div class="plan-pop-tag">Populaire</div>
+      <div class="plan-name">Pro</div>
+      <div class="plan-desc">Pour les structures actives — associations employeuses, TPE, cabinets de gestion.</div>
+      <div class="plan-price">
+        <div class="plan-amount">59€</div>
+        <div class="plan-per">/ mois</div>
+      </div>
+      <div class="plan-billed" style="display:flex;align-items:center;gap:0;padding:0"><div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--bd2),rgba(167,139,250,.3),var(--bd2),transparent)"></div></div>
+      <div class="plan-tokens">
+        <div class="plan-tokens-n">200</div>
+        <div class="plan-tokens-l">tokens<br>par mois</div>
+      </div>
+      <div class="plan-features">
+        <div class="plan-feat"><div class="plan-check">✓</div>Tous les outils <a href="https://finaia.web.app" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(62,207,142,.4)">Finaïa</a> du Starter</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>200 analyses IA / mois</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>Analyse coûts cachés</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>Rapport de gestion IA</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>Support prioritaire</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>ComptaScan — scan de factures IA</div>
+      </div>
+      <a href="#" class="plan-cta primary" onclick="handlePlan('pro');return false">Choisir Pro →</a>
+    </div>
+
+    <!-- EXPERT -->
+    <div class="plan">
+      <div class="plan-name">Expert</div>
+      <div class="plan-desc">Pour les professionnels — experts-comptables, cabinets, DAF multi-structures.</div>
+      <div class="plan-price">
+        <div class="plan-amount">99€</div>
+        <div class="plan-per">/ mois</div>
+      </div>
+      <div class="plan-billed" style="display:flex;align-items:center;gap:0;padding:0"><div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--bd2),rgba(167,139,250,.3),var(--bd2),transparent)"></div></div>
+      <div class="plan-tokens">
+        <div class="plan-tokens-n inf">∞</div>
+        <div class="plan-tokens-l">tokens<br>illimités</div>
+      </div>
+      <div class="plan-features">
+        <div class="plan-feat"><div class="plan-check">✓</div>Tous les outils <a href="https://finaia.web.app" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(62,207,142,.4)">Finaïa</a> du Pro</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>Analyses illimitées</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>Multi-structures</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>Accès anticipé nouvelles fonctionnalités</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>Support dédié</div>
+        <div class="plan-feat"><div class="plan-check">✓</div>ComptaScan — scan illimité de factures</div>
+      </div>
+      <a href="#" class="plan-cta ghost" onclick="handlePlan('expert');return false">Choisir Expert →</a>
+    </div>
+
+  </div>
+</div>
+
+<!-- FAQ -->
+<div class="faq" id="faq">
+  <h2 class="faq-title">Questions <i>fréquentes</i></h2>
+
+  <div class="faq-item">
+    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Qu'est-ce qu'un token ?</div>
+    <div class="faq-a">Un token correspond à une analyse IA : import d'une facture, contrôle d'un bulletin de paie, génération d'un rapport, analyse d'un FEC… Chaque appel à l'intelligence artificielle consomme 1 token.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Les tokens non utilisés sont-ils reportés ?</div>
+    <div class="faq-a">Non, les tokens sont réinitialisés chaque mois à la date de renouvellement de votre abonnement. Le plan Expert bénéficie de tokens illimités.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Puis-je changer de plan en cours de mois ?</div>
+    <div class="faq-a">Oui, vous pouvez upgrader à tout moment. Le changement prend effet immédiatement et le prorata est calculé automatiquement. Vous pouvez aussi downgrader, le changement s'appliquera au prochain renouvellement.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Mes données sont-elles sécurisées ?</div>
+    <div class="faq-a">Vos fichiers (FEC, factures, bulletins) sont traités localement dans votre navigateur. Seuls les agrégats nécessaires à l'analyse IA transitent par nos serveurs sécurisés. Aucun fichier brut n'est stocké.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Comment fonctionne l'essai gratuit ?</div>
+    <div class="faq-a">Créez votre compte gratuitement — aucune carte bancaire n'est demandée. Vous recevez 10 tokens pour tester tous les outils. Une fois les tokens épuisés, choisissez un plan payant pour continuer.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Puis-je annuler à tout moment ?</div>
+    <div class="faq-a">Oui, tous les plans sont sans engagement. Annulez depuis votre espace client — votre accès reste actif jusqu'à la fin de la période payée.</div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="f-brand">Finaïa</div>
+  <span>Associations & Entreprises · France · Barème 2025</span>
+  <span style="color:var(--fog)">·</span>
+  <a href="index.html">Accueil</a>
+  <span style="color:var(--fog)">·</span>
+  <span>Propulsé par <a href="https://www.libradevmq.com/" target="_blank">LibraDev</a></span>
+</footer>
+
+<script>
+const CHECKOUT_URL = "https://createcheckoutsession-2czfc6w5yq-uc.a.run.app";
+let currentUser = null;
+
+firebase.auth().onAuthStateChanged(user => {
+  console.log('Auth state:', user ? user.email : 'not logged in');
+  currentUser = user;
+  const la = document.getElementById('nav-auth-area');
+  const ua = document.getElementById('nav-user-area');
+  const freeCta = document.getElementById('free-plan-cta');
+  if (user) {
+    if (la) la.style.display = 'none';
+    if (ua) ua.style.display = 'inline-flex';
+    const e = document.getElementById('nav-user-email');
+    if (e) e.textContent = user.email;
+    // Disable free plan button
+    if (freeCta) {
+      freeCta.textContent = 'Déjà inscrit ✓';
+      freeCta.style.opacity = '0.4';
+      freeCta.style.pointerEvents = 'none';
+      freeCta.style.cursor = 'default';
+    }
+  } else {
+    if (la) la.style.display = '';
+    if (ua) ua.style.display = 'none';
+    if (freeCta) {
+      freeCta.textContent = 'Créer mon compte →';
+      freeCta.style.opacity = '';
+      freeCta.style.pointerEvents = '';
+      freeCta.style.cursor = '';
+    }
+  }
+});
+
+async function handlePlan(plan) {
+  if (plan === 'free') {
+    window.location.href = 'https://finaia.web.app/dashboard.html';
+    return;
+  }
+  if (!currentUser) {
+    window.location.href = 'https://finaia.web.app/dashboard.html?plan=' + plan;
+    return;
+  }
+  try {
+    const btn = document.activeElement;
+    if (btn) { btn.style.opacity = '0.5'; btn.textContent = 'Redirection…'; }
+    const token = await currentUser.getIdToken();
+    const resp = await fetch(CHECKOUT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ plan })
+    });
+    const data = await resp.json();
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      alert('Erreur: ' + (data.error || 'Impossible de créer la session'));
+      if (btn) { btn.style.opacity = ''; btn.textContent = 'Réessayer →'; }
+    }
+  } catch(e) {
+    alert('Erreur: ' + e.message);
+  }
+}
+
+function showLogoutModal() { document.getElementById('logout-overlay').classList.add('show'); }
+function hideLogoutModal() { document.getElementById('logout-overlay').classList.remove('show'); }
+</script>
+
+<!-- FINAIA CHATBOT WIDGET — Include before </body> on any page -->
+<style>
+.fi-chat-btn{position:fixed;bottom:24px;right:24px;z-index:800;width:56px;height:56px;border-radius:16px;
+  background:linear-gradient(135deg,#7c5cfc,#a78bfa);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 8px 32px rgba(124,92,252,.4);transition:all .25s;}
+.fi-chat-btn:hover{transform:scale(1.08);box-shadow:0 12px 40px rgba(124,92,252,.55);}
+.fi-chat-btn svg{transition:all .2s;}
+.fi-chat-btn.open svg{transform:rotate(45deg);}
+.fi-chat-badge{position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:#22c55e;
+  font-size:10px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 8px rgba(34,197,94,.4);display:none;}
+
+.fi-chat-panel{position:fixed;bottom:92px;right:24px;z-index:800;width:380px;max-height:540px;
+  background:#0b0918;border:1px solid #302c54;border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,.6);
+  display:flex;flex-direction:column;overflow:hidden;
+  opacity:0;visibility:hidden;transform:translateY(16px) scale(.96);transition:all .25s cubic-bezier(.4,0,.2,1);}
+.fi-chat-panel.open{opacity:1;visibility:visible;transform:translateY(0) scale(1);}
+@media(max-width:440px){.fi-chat-panel{width:calc(100vw - 32px);right:16px;bottom:84px;max-height:70vh;}}
+
+.fi-chat-head{padding:16px 20px;background:linear-gradient(135deg,rgba(124,92,252,.15),rgba(167,139,250,.08));
+  border-bottom:1px solid #302c54;display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.fi-chat-head-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#7c5cfc,#a78bfa);
+  display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:900;color:#fff;}
+.fi-chat-head-title{font-family:'Fraunces',serif;font-size:15px;font-weight:700;color:#f3efff;}
+.fi-chat-head-sub{font-size:10px;color:#6a637f;font-family:'DM Mono',monospace;}
+.fi-chat-head-close{margin-left:auto;background:none;border:none;color:#6a637f;cursor:pointer;padding:4px;transition:color .2s;}
+.fi-chat-head-close:hover{color:#bab4d4;}
+
+.fi-chat-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:200px;}
+.fi-chat-body::-webkit-scrollbar{width:3px;}.fi-chat-body::-webkit-scrollbar-thumb{background:#302c54;border-radius:3px;}
+
+.fi-msg{max-width:85%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6;word-break:break-word;}
+.fi-msg.bot{align-self:flex-start;background:#111024;border:1px solid #221f40;color:#bab4d4;border-bottom-left-radius:4px;}
+.fi-msg.user{align-self:flex-end;background:linear-gradient(135deg,#7c5cfc,#a78bfa);color:#fff;border-bottom-right-radius:4px;}
+.fi-msg.bot strong{color:#f3efff;}
+.fi-msg.typing{color:#6a637f;font-style:italic;}
+.fi-msg.err{color:#fca5a5;background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.15);}
+.fi-msg.limit{color:#fcd34d;background:rgba(245,158,11,.06);border-color:rgba(245,158,11,.15);font-size:12px;}
+
+.fi-chat-footer{padding:12px 16px;border-top:1px solid #221f40;display:flex;gap:8px;flex-shrink:0;background:#0b0918;}
+.fi-chat-input{flex:1;padding:10px 14px;background:#111024;border:1px solid #221f40;border-radius:10px;color:#f3efff;
+  font-size:13px;font-family:'DM Sans',sans-serif;outline:none;resize:none;min-height:40px;max-height:80px;transition:border-color .2s;}
+.fi-chat-input:focus{border-color:#a78bfa;}
+.fi-chat-input::placeholder{color:#35305a;}
+.fi-chat-send{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#7c5cfc,#a78bfa);border:none;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0;}
+.fi-chat-send:hover{transform:scale(1.05);}
+.fi-chat-send:disabled{opacity:.3;cursor:not-allowed;transform:none;}
+.fi-chat-send svg{pointer-events:none;}
+
+.fi-chat-quota{padding:6px 12px;background:rgba(167,139,250,.04);border-top:1px solid #221f40;
+  font-size:10px;color:#6a637f;font-family:'DM Mono',monospace;text-align:center;flex-shrink:0;}
+</style>
+
+<!-- Chat button -->
+<button class="fi-chat-btn" id="fi-chat-btn" onclick="toggleChat()">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+</button>
+
+<!-- Chat panel -->
+<div class="fi-chat-panel" id="fi-chat-panel">
+  <div class="fi-chat-head">
+    <div class="fi-chat-head-icon">Fï</div>
+    <div>
+      <div class="fi-chat-head-title">Assistant Finaïa</div>
+      <div class="fi-chat-head-sub">Expert comptabilité · CRC 99-01 · PCG</div>
+    </div>
+    <button class="fi-chat-head-close" onclick="toggleChat()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="fi-chat-body" id="fi-chat-body">
+    <div class="fi-msg bot">Bonjour ! Je suis l'assistant comptable Finaïa. Je peux vous aider sur la comptabilité associative (CRC 99-01), le PCG, les cotisations, les fonds dédiés, la TVA DOM-TOM, ou l'utilisation de nos outils. Posez-moi votre question !</div>
+  </div>
+  <div class="fi-chat-quota" id="fi-chat-quota"></div>
+  <div class="fi-chat-footer">
+    <textarea class="fi-chat-input" id="fi-chat-input" placeholder="Votre question…" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+    <button class="fi-chat-send" id="fi-chat-send" onclick="sendChat()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const PROXY="https://proxyai-2czfc6w5yq-uc.a.run.app";
+  const SYS=`Tu es l'assistant comptable IA de Finaïa, une suite d'outils comptables pour associations (CRC 99-01) et entreprises (PCG) en France métropolitaine et DOM-TOM.
+
+Tu es expert en :
+- Comptabilité associative CRC 99-01 / ANC 2018-06
+- Plan Comptable Général (PCG)
+- Cotisations sociales : URSSAF, AGIRC-ARRCO, CSG/CRDS, barèmes 2024-2026
+- TVA : taux métropole (20%, 10%, 5,5%), DOM (8,5%, 2,1%), Guyane (0%)
+- Fonds dédiés (comptes 194, 689, 789)
+- Exonérations DOM-TOM : LODEOM, réduction générale
+- FEC (Fichier des Écritures Comptables)
+- Préparation AG, rapport moral, annexes
+- Fonctionnement des outils Finaïa
+
+Règles :
+- Réponds en français, de manière concise et professionnelle (max 300 mots)
+- Utilise les termes comptables précis
+- Si tu ne sais pas, dis-le honnêtement
+- Ne donne jamais de conseil juridique ou fiscal définitif — recommande de consulter un expert-comptable pour les cas complexes
+- Si on te pose une question sur Finaïa : explique comment utiliser l'outil concerné
+- Adapte ton vocabulaire au territoire si mentionné (Martinique, Guadeloupe, etc.)`;
+
+  let chatHistory=[];
+  let chatOpen=false;
+
+  window.toggleChat=function(){
+    chatOpen=!chatOpen;
+    document.getElementById('fi-chat-panel').classList.toggle('open',chatOpen);
+    document.getElementById('fi-chat-btn').classList.toggle('open',chatOpen);
+    if(chatOpen){
+      document.getElementById('fi-chat-input').focus();
+      updateQuota();
+    }
+  };
+
+  function addMsg(text,type){
+    const body=document.getElementById('fi-chat-body');
+    const div=document.createElement('div');
+    div.className='fi-msg '+type;
+    // Simple markdown
+    div.innerHTML=text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+    body.appendChild(div);
+    body.scrollTop=body.scrollHeight;
+    return div;
+  }
+
+  async function updateQuota(){
+    const el=document.getElementById('fi-chat-quota');
+    if(!window.firebase||!firebase.auth().currentUser){el.textContent='Connectez-vous pour utiliser le chat';return;}
+    // We don't know the exact daily count client-side; show generic info
+    try{
+      const t=await firebase.auth().currentUser.getIdToken();
+      const r=await fetch("https://getuserprofile-2czfc6w5yq-uc.a.run.app",{headers:{'Authorization':'Bearer '+t}});
+      if(r.ok){
+        const p=await r.json();
+        const isPaid=['starter','pro','expert'].includes(p.plan);
+        el.textContent=isPaid?'Chat illimité · Plan '+(p.plan.charAt(0).toUpperCase()+p.plan.slice(1)):'Plan gratuit · 3 messages/jour';
+      }
+    }catch(e){el.textContent='';}
+  }
+
+  window.sendChat=async function(){
+    const input=document.getElementById('fi-chat-input');
+    const text=input.value.trim();
+    if(!text)return;
+    input.value='';
+
+    // Check auth
+    if(!window.firebase||!firebase.auth().currentUser){
+      addMsg('Vous devez être connecté pour utiliser le chat. <a href="dashboard.html" style="color:#a78bfa">Se connecter →</a>','err');
+      return;
+    }
+
+    addMsg(text,'user');
+    chatHistory.push({role:'user',content:text});
+
+    // Typing indicator
+    const typing=addMsg('En train de réfléchir…','bot typing');
+    document.getElementById('fi-chat-send').disabled=true;
+
+    try{
+      const token=await firebase.auth().currentUser.getIdToken();
+      // Keep last 10 messages for context
+      const msgs=chatHistory.slice(-10);
+      const resp=await fetch(PROXY,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,system:SYS,messages:msgs,tool:'chat'})
+      });
+      const data=await resp.json();
+      typing.remove();
+
+      if(data.error){
+        if(data.chatLimit){
+          addMsg('Vous avez atteint la limite de 3 messages/jour sur le plan gratuit. <a href="tarifs.html" style="color:#a78bfa">Passer à un plan payant →</a>','limit');
+        }else{
+          addMsg('Erreur : '+data.error,'err');
+        }
+        return;
+      }
+
+      const reply=(data.content||[]).map(b=>b.text||'').join('');
+      chatHistory.push({role:'assistant',content:reply});
+      addMsg(reply,'bot');
+    }catch(e){
+      typing.remove();
+      addMsg('Erreur de connexion. Réessayez.','err');
+    }finally{
+      document.getElementById('fi-chat-send').disabled=false;
+      document.getElementById('fi-chat-input').focus();
+    }
+  };
+})();
+</script>
+
+</body>
+</html>
