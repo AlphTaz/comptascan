@@ -600,7 +600,14 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated }) {
       const result = await extractInvoiceData(images, planComptable, entityType);
       onEcrituresGenerated(genererEcritures(result.factures, planComptable, entityType));
       setImages([]);
-    } catch(e) { setError("Erreur : "+e.message); }
+    } catch(e) {
+      const msg = e.message || "";
+      if (msg.includes("tokenLimit") || msg.includes("token") || msg.includes("quota")) {
+        setError("Tokens épuisés — Vous avez atteint votre quota mensuel. Passez à un plan supérieur.");
+      } else {
+        setError("Erreur : " + msg);
+      }
+    }
     setLoading(false);
   };
 
@@ -877,7 +884,7 @@ function PlanComptableView({ planComptable, setPlanComptable, entityType }) {
 }
 
 // ─── APP ───
-export default function ComptaScan() {
+export default function ComptaScan({ user, userProfile, onHome }) {
   const [entityType, setEntityType] = useState("entreprise");
   const [tab, setTab] = useState("scan");
   const [ecritures, setEcritures] = useState([]);
@@ -917,8 +924,41 @@ export default function ComptaScan() {
       <div style={{ padding:"18px 18px 0", display:"flex", alignItems:"center", gap:10 }}>
         <div style={{ width:34, height:34, borderRadius:9, background:`linear-gradient(135deg,${p.accent},#2BA86E)`, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, color:p.bg, fontSize:17, boxShadow:`0 0 18px ${p.accentGlow}` }}>C</div>
         <div style={{ fontSize:19, fontWeight:700, letterSpacing:-0.5, color:p.white }}>ComptaScan</div>
-        <div style={{ marginLeft:"auto", fontSize:10, color:p.textDim, background:p.surface, border:`1px solid ${p.border}`, padding:"3px 8px", borderRadius:20 }}>DÉMO</div>
+        <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:8 }}>
+          {/* Tokens */}
+          {userProfile && (
+            <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 10px", borderRadius:20, background:p.surface, border:`1px solid ${p.border}` }}>
+              {userProfile.tokensRemaining === -1 ? (
+                <span style={{ fontSize:10, color:p.accent, fontFamily:mono, fontWeight:700 }}>∞ illimité</span>
+              ) : (
+                <>
+                  <div style={{ width:28, height:4, borderRadius:2, background:p.border, overflow:"hidden" }}>
+                    <div style={{ height:"100%", borderRadius:2, background: userProfile.tokensRemaining === 0 ? p.danger : userProfile.tokensRemaining <= (userProfile.tokensTotal * 0.2) ? p.warn : p.accent, width:`${Math.min(100, Math.round((userProfile.tokensRemaining / (userProfile.tokensTotal||10)) * 100))}%`, transition:"width 0.4s" }} />
+                  </div>
+                  <span style={{ fontSize:10, color: userProfile.tokensRemaining === 0 ? p.danger : p.textMuted, fontFamily:mono, fontWeight:600 }}>
+                    {userProfile.tokensRemaining}<span style={{ color:p.textDim }}>/{userProfile.tokensTotal}</span>
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+          {/* Bouton accueil */}
+          {onHome && (
+            <button onClick={onHome} style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 11px", borderRadius:20, border:`1px solid ${p.border}`, background:p.surface, color:p.textMuted, fontSize:11, fontWeight:600, fontFamily:font, cursor:"pointer" }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+              Accueil
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Alerte tokens épuisés */}
+      {userProfile && userProfile.tokensRemaining === 0 && userProfile.tokensRemaining !== -1 && (
+        <div style={{ margin:"12px 18px 0", padding:"10px 14px", borderRadius:10, background:p.dangerDim, border:`1px solid ${p.danger}44`, fontSize:12, color:p.danger, lineHeight:1.5 }}>
+          <strong>Tokens épuisés</strong> — Vous avez utilisé tous vos tokens ce mois-ci.{" "}
+          <a href="tarifs.html" style={{ color:p.danger, fontWeight:700 }}>Passer au plan supérieur →</a>
+        </div>
+      )}
 
       {/* ENTITY */}
       <div style={{ display:"flex", background:p.surface, borderRadius:12, padding:3, border:`1px solid ${p.border}`, margin:"14px 18px 0" }}>
