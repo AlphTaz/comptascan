@@ -4,7 +4,7 @@ import { palette, font, fontDisplay, mono, GLOBAL_CSS } from "./design.js";
 const NAV_H = 64;
 
 // ─── NAVBAR ───
-function Navbar({ user, onGoApp, onGoAccount, onLogin }) {
+function Navbar({ user, onGoApp, onGoAccount, onLogin, onGoTarifs }) {
   return (
     <nav style={{
       position: "fixed", top: 0, left: 0, right: 0, height: NAV_H, zIndex: 100,
@@ -27,11 +27,11 @@ function Navbar({ user, onGoApp, onGoAccount, onLogin }) {
           </>
         ) : (
           <>
-            <a href="tarifs-comptascan.html" style={{ padding: "7px 14px", borderRadius: 8, border: `1px solid ${palette.border}`, background: "transparent", color: palette.textMuted, fontSize: 13, fontWeight: 500, textDecoration: "none", transition: "color 0.15s" }}
+            <button onClick={onGoTarifs} style={{ padding: "7px 14px", borderRadius: 8, border: `1px solid ${palette.border}`, background: "transparent", color: palette.textMuted, fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "color 0.15s" }}
               onMouseOver={e => e.currentTarget.style.color = palette.accent}
               onMouseOut={e => e.currentTarget.style.color = palette.textMuted}>
               Tarifs
-            </a>
+            </button>
             <button onClick={onLogin} style={{ padding: "7px 14px", borderRadius: 8, border: `1px solid ${palette.border}`, background: "transparent", color: palette.textMuted, fontSize: 13, fontWeight: 500 }}>
               Connexion
             </button>
@@ -46,7 +46,7 @@ function Navbar({ user, onGoApp, onGoAccount, onLogin }) {
 }
 
 // ─── HERO ───
-function Hero({ user, onGoApp, onLogin }) {
+function Hero({ user, onGoApp, onLogin, onGoTarifs }) {
   return (
     <section style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: `${NAV_H + 60}px 24px 80px`, textAlign: "center", position: "relative", overflow: "hidden" }}>
       {/* Fond radial */}
@@ -80,11 +80,11 @@ function Hero({ user, onGoApp, onLogin }) {
             onMouseOut={e => { e.currentTarget.style.borderColor = palette.border; e.currentTarget.style.color = palette.textMuted; }}>
             Voir les fonctionnalités ↓
           </a>
-          <a href="tarifs-comptascan.html" style={{ padding: "14px 24px", borderRadius: 12, border: `1px solid ${palette.accentGlow}`, background: palette.accentDim, color: palette.accent, fontSize: 15, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 6, transition: "all 0.2s", textDecoration: "none" }}
+          <button onClick={onGoTarifs} style={{ padding: "14px 24px", borderRadius: 12, border: `1px solid ${palette.accentGlow}`, background: palette.accentDim, color: palette.accent, fontSize: 15, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 6, transition: "all 0.2s", cursor: "pointer" }}
             onMouseOver={e => { e.currentTarget.style.background = "rgba(62,207,142,0.18)"; }}
             onMouseOut={e => { e.currentTarget.style.background = palette.accentDim; }}>
             Voir les tarifs →
-          </a>
+          </button>
         </div>
 
         {/* Stats */}
@@ -240,12 +240,12 @@ function Footer() {
 }
 
 // ─── LANDING PAGE ───
-export default function LandingPage({ user, onGoApp, onGoAccount, onLogin }) {
+export default function LandingPage({ user, onGoApp, onGoAccount, onLogin, onGoTarifs }) {
   return (
     <div style={{ fontFamily: font, background: palette.bg, color: palette.text, minHeight: "100vh" }}>
       <style>{GLOBAL_CSS}</style>
-      <Navbar user={user} onGoApp={onGoApp} onGoAccount={onGoAccount} onLogin={onLogin} />
-      <Hero user={user} onGoApp={onGoApp} onLogin={onLogin} />
+      <Navbar user={user} onGoApp={onGoApp} onGoAccount={onGoAccount} onLogin={onLogin} onGoTarifs={onGoTarifs} />
+      <Hero user={user} onGoApp={onGoApp} onLogin={onLogin} onGoTarifs={onGoTarifs} />
       <Features />
       <FAQ />
       <CTAFinal user={user} onGoApp={onGoApp} onLogin={onLogin} />

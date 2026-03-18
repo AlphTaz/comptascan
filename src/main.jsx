@@ -5,6 +5,7 @@ import LandingPage from "./LandingPage.jsx";
 import AuthScreen from "./AuthScreen.jsx";
 import AccountPage from "./AccountPage.jsx";
 import ComptaScan from "./ComptaScan.jsx";
+import TarifsPage from "./TarifsPage.jsx";
 import { registerSW } from "virtual:pwa-register";
 
 registerSW({ onNeedRefresh() { if (confirm("Nouvelle version disponible. Mettre à jour ?")) location.reload(); } });
@@ -51,6 +52,7 @@ function App() {
   const goAccount = () => user ? setRoute("account") : setRoute("auth");
   const goHome    = () => setRoute("landing");
   const goAuth    = () => setRoute("auth");
+  const goTarifs  = () => setRoute("tarifs");
 
   // Chargement initial Firebase
   if (user === undefined) {
@@ -64,6 +66,7 @@ function App() {
   if (route === "auth")    return <AuthScreen onBack={goHome} />;
   if (route === "app")     return <ComptaScan user={user} onHome={goHome} />;
   if (route === "account") return <AccountPage user={user} onHome={goHome} onGoApp={goApp} />;
+  if (route === "tarifs")  return <TarifsPage user={user} onHome={goHome} onLogin={goAuth} />;
 
   return (
     <LandingPage
@@ -71,6 +74,7 @@ function App() {
       onGoApp={goApp}
       onGoAccount={goAccount}
       onLogin={goAuth}
+      onGoTarifs={goTarifs}
     />
   );
 }
