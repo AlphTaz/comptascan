@@ -516,12 +516,17 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
 
   const handleFiles = useCallback(async files => {
     for (const f of Array.from(files)) {
       if (f.type.startsWith("image/")) {
         const reader = new FileReader();
-        reader.onload = e => setImages(prev=>[...prev,{ id:crypto.randomUUID(), name:f.name, data:e.target.result.split(",")[1], type:f.type, preview:e.target.result }]);
+        reader.onload = e => setImages(prev=>[...prev,{
+          id: crypto.randomUUID(), name: f.name,
+          data: e.target.result.split(",")[1], type: f.type, preview: e.target.result
+        }]);
         reader.readAsDataURL(f);
       }
     }
@@ -538,34 +543,123 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated }) {
     setLoading(false);
   };
 
+  const iconCamera = (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+      <circle cx="12" cy="13" r="4"/>
+    </svg>
+  );
+
   return (
     <div style={{ padding:"18px" }}>
-      <div style={{ fontSize:11, fontWeight:700, color:p.textMuted, textTransform:"uppercase", letterSpacing:1.2, marginBottom:14 }}>Ajouter des factures</div>
-      <div style={s.infoBox(entityType==="association"?p.purple:p.blue)}>
-        {entityType==="association"?<><strong>Mode Association</strong> — Sans TVA. Plan 1901.</>:<><strong>Mode Entreprise</strong> — TVA extraite automatiquement.</>}
+      <div style={{ fontSize:11, fontWeight:700, color:p.textMuted, textTransform:"uppercase", letterSpacing:1.2, marginBottom:14 }}>
+        Ajouter des factures
       </div>
-      <label style={{ background:dragOver?p.accentDim:p.surface, borderRadius:14, border:`2px dashed ${dragOver?p.accent:p.borderLight}`, padding:"36px 20px", textAlign:"center", cursor:"pointer", display:"block", transition:"all 0.25s", marginBottom:14 }}
-        onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)}
-        onDrop={e=>{e.preventDefault();setDragOver(false);handleFiles(e.dataTransfer.files);}}>
-        <div style={{ color:p.accent, marginBottom:10 }}>{Icon.upload}</div>
-        <div style={{ fontSize:14, fontWeight:600, color:p.text, marginBottom:5 }}>Importer des factures</div>
-        <div style={{ fontSize:12, color:p.textDim }}>JPG, PNG, WEBP · Glisser-déposer ou cliquer</div>
-        <input type="file" accept="image/jpeg,image/png,image/webp" multiple style={{ display:"none" }} onChange={e=>handleFiles(e.target.files)} />
-      </label>
-      {images.length>0 && (
+
+      <div style={s.infoBox(entityType==="association" ? p.purple : p.blue)}>
+        {entityType==="association"
+          ? <><strong>Mode Association</strong> — Sans TVA. Plan 1901.</>
+          : <><strong>Mode Entreprise</strong> — TVA extraite automatiquement.</>}
+      </div>
+
+      {/* ── Boutons d'import ── */}
+      <div style={{ display:"flex", gap:10, marginBottom:14 }}>
+        {/* Caméra — capture directe mobile */}
+        <button
+          onClick={() => cameraInputRef.current?.click()}
+          style={{ ...s.btn("primary"), flex:1 }}
+        >
+          {iconCamera} Photo
+        </button>
+        {/* Galerie / fichiers */}
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          style={{ ...s.btn("ghost"), flex:1 }}
+        >
+          {Icon.upload} Galerie / PDF
+        </button>
+      </div>
+
+      {/* Inputs cachés — déclenchés programmatiquement via ref */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display:"none" }}
+        onChange={e => { handleFiles(e.target.files); e.target.value=""; }}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png,image/webp"
+        multiple
+        style={{ display:"none" }}
+        onChange={e => { handleFiles(e.target.files); e.target.value=""; }}
+      />
+
+      {/* Zone drag & drop desktop */}
+      <div
+        style={{
+          background: dragOver ? p.accentDim : p.surface,
+          borderRadius: 14,
+          border: `2px dashed ${dragOver ? p.accent : p.borderLight}`,
+          padding: "24px 20px",
+          textAlign: "center",
+          cursor: "pointer",
+          transition: "all 0.25s",
+          marginBottom: 14,
+        }}
+        onClick={() => fileInputRef.current?.click()}
+        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+      >
+        <div style={{ fontSize:12, color:p.textDim, marginBottom:3 }}>Ou glisser-déposer ici</div>
+        <div style={{ fontSize:11, color:p.textDim }}>JPG · PNG · WEBP</div>
+      </div>
+
+      {/* Miniatures des images chargées */}
+      {images.length > 0 && (
         <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:14 }}>
-          {images.map(img=>(
-            <div key={img.id} style={{ position:"relative", width:64, height:64, borderRadius:8, overflow:"hidden", border:`1px solid ${p.border}` }}>
+          {images.map(img => (
+            <div key={img.id} style={{ position:"relative", width:66, height:66, borderRadius:8, overflow:"hidden", border:`1px solid ${p.border}` }}>
               <img src={img.preview} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-              <div style={{ position:"absolute", top:2, right:2, background:"rgba(0,0,0,0.7)", borderRadius:4, padding:"2px 4px", cursor:"pointer" }} onClick={()=>setImages(prev=>prev.filter(x=>x.id!==img.id))}>{Icon.x}</div>
+              <div
+                style={{ position:"absolute", top:2, right:2, background:"rgba(0,0,0,0.75)", borderRadius:4, padding:"2px 4px", cursor:"pointer", display:"flex" }}
+                onClick={() => setImages(prev => prev.filter(x => x.id !== img.id))}
+              >
+                {Icon.x}
+              </div>
             </div>
           ))}
+          {/* Bouton + pour ajouter d'autres images */}
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            style={{ width:66, height:66, borderRadius:8, border:`1px dashed ${p.borderLight}`, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:p.textDim }}
+          >
+            {Icon.plus}
+          </div>
         </div>
       )}
-      <button style={{ ...s.btn("primary"), opacity:images.length===0?0.35:1, cursor:images.length===0?"not-allowed":"pointer" }} onClick={analyze} disabled={loading||images.length===0}>
-        {loading?<><div style={s.spinner}/> Analyse IA...</>:<>{Icon.scan} Analyser {images.length>0?`${images.length} image(s)`:"des factures"}</>}
+
+      {/* Bouton analyser */}
+      <button
+        style={{ ...s.btn("primary"), opacity: images.length===0 ? 0.35 : 1, cursor: images.length===0 ? "not-allowed" : "pointer" }}
+        onClick={analyze}
+        disabled={loading || images.length===0}
+      >
+        {loading
+          ? <><div style={s.spinner}/> Analyse IA...</>
+          : <>{Icon.scan} Analyser {images.length > 0 ? `${images.length} image(s)` : "des factures"}</>
+        }
       </button>
-      {error && <div style={{ ...s.card, marginTop:12, borderColor:p.danger, background:p.dangerDim, color:p.danger, fontSize:12 }}>{error}</div>}
+
+      {error && (
+        <div style={{ ...s.card, marginTop:12, borderColor:p.danger, background:p.dangerDim, color:p.danger, fontSize:12 }}>
+          {error}
+        </div>
+      )}
     </div>
   );
 }
