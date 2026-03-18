@@ -873,6 +873,21 @@ function genererEcritures(factures, planComptable, entityType, fecData) {
       lignes.push({ compte: compteTVABase, libelle: `TVA déductible ${f.taux_tva || 20}% - ${f.fournisseur}`, debit: Math.round(f.tva * 100) / 100, credit: 0 });
     }
 
+    // Taxes annexes (Octroi de Mer, OMR, TSS, TGCA…)
+    if (Array.isArray(f.taxes)) {
+      f.taxes.forEach(tax => {
+        if (tax.montant > 0) {
+          const compteTax = adapterCompte(tax.compte || "445800", compteLength);
+          lignes.push({
+            compte: compteTax,
+            libelle: `${tax.nom} ${tax.taux ? tax.taux + "%" : ""} - ${f.fournisseur}`,
+            debit: Math.round(tax.montant * 100) / 100,
+            credit: 0,
+          });
+        }
+      });
+    }
+
     lignes.push({
       compte: fecMatch?.compteAux || compteFournisseurBase,
       compteAux: fecMatch?.compteAuxNum || null,
@@ -890,6 +905,7 @@ function genererEcritures(factures, planComptable, entityType, fecData) {
       montantTTC: Math.round(f.montant_ttc * 100) / 100,
       journal: journalAchat,
       lignes: lignesFinales,
+      taxes: f.taxes || [],
       status: "validée", entityType,
       fecMatch: !!fecMatch, fecMatchNom: fecMatch?.nomOriginal,
       equilibre, ecartAvantCorrection: ecart, compteLength,
@@ -922,8 +938,15 @@ async function extractInvoiceData(images, planComptable, entityType, fecData) {
   const imageContents = images.map((img) => ({ type: "image", source: { type: "base64", media_type: img.type, data: img.data } }));
 
   const tvaInstruction = config.tvaApplicable
-    ? `L'entité est ASSUJETTIE à la TVA. Extrais le montant HT, la TVA et le TTC. Si la TVA n'apparaît pas, essaie de la déduire (taux standard 20%, intermédiaire 10%, réduit 5.5%).`
-    : `L'entité est une ASSOCIATION généralement NON ASSUJETTIE à la TVA. Le montant TTC = montant total payé. Mets tva à 0 et montant_ht = montant_ttc SAUF si la facture montre explicitement une TVA récupérable.`;
+    ? `L'entité est ASSUJETTIE à la TVA. Extrais le montant HT, la TVA et le TTC. Si la TVA n'apparaît pas, essaie de la déduire (taux standard 20%, intermédiaire 10%, réduit 5.5%).
+TAXES SPÉCIALES DOM/Antilles — détecte et liste TOUTES les taxes présentes sur la facture dans le tableau "taxes" :
+- Octroi de Mer (OM) : taxe locale Antilles/Guyane/Réunion/Mayotte sur importations et productions locales
+- Octroi de Mer Régional (OMR) : surtaxe régionale s'ajoutant à l'OM
+- TSS (Taxe Spéciale de Solidarité) ou TGCA (Taxe Générale sur le Chiffre d'Affaires) à La Réunion
+- Toute autre taxe, contribution ou parafiscalité mentionnée sur la facture
+Pour chaque taxe détectée : indique son nom, son taux (%) et son montant.`
+    : `L'entité est une ASSOCIATION généralement NON ASSUJETTIE à la TVA. Le montant TTC = montant total payé. Mets tva à 0 et montant_ht = montant_ttc SAUF si la facture montre explicitement une TVA récupérable.
+Détecte quand même dans le tableau "taxes" toutes les taxes annexes visibles (Octroi de Mer, OMR, etc.).`;
 
   const contextInstruction = entityType === "association"
     ? `C'est la comptabilité d'une ASSOCIATION loi 1901. Utilise la terminologie associative (emplois/ressources, excédent/déficit).`
@@ -969,15 +992,21 @@ Réponds UNIQUEMENT avec un JSON valide (sans backticks, sans texte autour) :
       "date": "YYYY-MM-DD",
       "montant_ht": 0.00,
       "tva": 0.00,
-      "montant_ttc": 0.00,
       "taux_tva": 20,
+      "montant_ttc": 0.00,
       "description": "Description courte",
       "compte_charge": "Numéro de compte le plus approprié",
-      "fec_match": true
+      "fec_match": true,
+      "taxes": [
+        { "nom": "Octroi de Mer", "code": "OM", "taux": 8.5, "montant": 0.00, "compte": "445800" },
+        { "nom": "Octroi de Mer Régional", "code": "OMR", "taux": 2.5, "montant": 0.00, "compte": "445800" }
+      ]
     }
   ]
 }
 
+Le tableau "taxes" liste TOUTES les taxes hors TVA standard (Octroi de Mer, OMR, TSS, TGCA…). S'il n'y en a pas, mets [].
+Pour le compte comptable : OM/OMR → 445800, autres taxes → 447000.
 Si le fournisseur est reconnu dans le FEC, mets fec_match à true. Utilise les comptes du plan comptable fourni.`,
           },
         ],
@@ -1448,7 +1477,10 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) 
 }
 
 // ─── ECRITURES VIEW ───
-function EcrituresView({ ecritures, entityType, onDelete }) {
+function EcrituresView({ ecritures, entityType, onDelete, onUpdate }) {
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState(null);
+
   const exportOne = (e) => downloadCSV(generateCSV([e]), `ecriture_${e.piece}.csv`);
   const exportAll = () => {
     if (!ecritures.length) return;
@@ -1456,6 +1488,49 @@ function EcrituresView({ ecritures, entityType, onDelete }) {
   };
   const totalDebit = ecritures.reduce((s, e) => s + e.lignes.reduce((a, l) => a + (l.debit || 0), 0), 0);
   const totalCredit = ecritures.reduce((s, e) => s + e.lignes.reduce((a, l) => a + (l.credit || 0), 0), 0);
+
+  const startEdit = (e) => {
+    setEditingId(e.id);
+    setEditDraft(JSON.parse(JSON.stringify(e)));
+  };
+
+  const cancelEdit = () => { setEditingId(null); setEditDraft(null); };
+
+  const saveEdit = () => {
+    if (!editDraft) return;
+    // Recalcul TTC depuis les lignes
+    const newTTC = editDraft.lignes.reduce((s, l) => s + (l.credit || 0), 0);
+    const draft = { ...editDraft, montantTTC: Math.round(newTTC * 100) / 100 };
+    const { equilibre, ecart, lignes } = verifierEquilibreLocal(draft.lignes);
+    onUpdate({ ...draft, lignes, equilibre, ecartAvantCorrection: ecart });
+    setEditingId(null);
+    setEditDraft(null);
+  };
+
+  const verifierEquilibreLocal = (lignes) => {
+    const totalDebit = lignes.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0);
+    const totalCredit = lignes.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
+    const ecart = Math.round((totalDebit - totalCredit) * 100) / 100;
+    return { equilibre: Math.abs(ecart) < 0.01, ecart, lignes };
+  };
+
+  const updateDraftLigne = (i, field, value) => {
+    setEditDraft(d => {
+      const lignes = [...d.lignes];
+      lignes[i] = { ...lignes[i], [field]: field === "debit" || field === "credit" ? parseFloat(value) || 0 : value };
+      return { ...d, lignes };
+    });
+  };
+
+  const addDraftLigne = () => {
+    setEditDraft(d => ({ ...d, lignes: [...d.lignes, { compte: "", libelle: "", debit: 0, credit: 0 }] }));
+  };
+
+  const removeDraftLigne = (i) => {
+    setEditDraft(d => ({ ...d, lignes: d.lignes.filter((_, idx) => idx !== i) }));
+  };
+
+  const inputStyle = { background: palette.bg, border: `1px solid ${palette.borderLight}`, borderRadius: 6, color: palette.text, fontFamily: mono, fontSize: 11, padding: "3px 6px", outline: "none", width: "100%" };
 
   return (
     <div style={css.section}>
@@ -1486,70 +1561,185 @@ function EcrituresView({ ecritures, entityType, onDelete }) {
           <div style={{ fontSize: 12, marginTop: 6, color: palette.textDim }}>Ajoutez des photos de factures pour générer des écritures</div>
         </div>
       ) : (
-        ecritures.map((e) => (
-          <div key={e.id} style={css.card}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{e.fournisseur}</div>
-                <div style={{ fontSize: 12, color: palette.textMuted }}>{e.date} • {e.piece}</div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontFamily: mono, fontWeight: 700, fontSize: 16, color: palette.accent }}>{e.montantTTC.toFixed(2)} €</div>
-                <div style={{ display: "flex", gap: 4, justifyContent: "flex-end", marginTop: 4, flexWrap: "wrap" }}>
-                  <span style={css.badge(palette.accent)}>{e.journal}</span>
-                  {e.entityType === "association" && <span style={css.badge(palette.purple)}>ASSO</span>}
-                  {e.fecMatch && <span style={css.badge(palette.orange)}>FEC ✓</span>}
-                  {!e.fecMatch && <span style={{ ...css.badge(palette.blue), border: `1px dashed ${palette.blue}` }}>✦ Nouveau</span>}
+        ecritures.map((e) => {
+          const isEditing = editingId === e.id;
+          const d = isEditing ? editDraft : e;
+          const draftEquilibre = isEditing ? verifierEquilibreLocal(editDraft.lignes) : null;
+          const draftDebitTotal = isEditing ? editDraft.lignes.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0) : 0;
+          const draftCreditTotal = isEditing ? editDraft.lignes.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0) : 0;
+
+          return (
+            <div key={e.id} style={{ ...css.card, borderColor: isEditing ? palette.accent : palette.border }}>
+              {/* HEADER */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {isEditing ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <input
+                        style={{ ...inputStyle, fontFamily: font, fontSize: 13, fontWeight: 600, color: palette.text }}
+                        value={editDraft.fournisseur}
+                        onChange={ev => setEditDraft(d => ({ ...d, fournisseur: ev.target.value }))}
+                        placeholder="Fournisseur"
+                      />
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <input
+                          style={{ ...inputStyle, width: "48%", fontFamily: font }}
+                          type="date"
+                          value={editDraft.date}
+                          onChange={ev => setEditDraft(d => ({ ...d, date: ev.target.value }))}
+                        />
+                        <input
+                          style={{ ...inputStyle, width: "48%", fontFamily: font }}
+                          value={editDraft.piece}
+                          onChange={ev => setEditDraft(d => ({ ...d, piece: ev.target.value }))}
+                          placeholder="N° pièce"
+                        />
+                      </div>
+                      <input
+                        style={{ ...inputStyle, fontFamily: font }}
+                        value={editDraft.journal}
+                        onChange={ev => setEditDraft(d => ({ ...d, journal: ev.target.value }))}
+                        placeholder="Journal (ex: ACH)"
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{e.fournisseur}</div>
+                      <div style={{ fontSize: 12, color: palette.textMuted }}>{e.date} • {e.piece}</div>
+                    </>
+                  )}
                 </div>
+                {!isEditing && (
+                  <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 10 }}>
+                    <div style={{ fontFamily: mono, fontWeight: 700, fontSize: 16, color: palette.accent }}>{e.montantTTC.toFixed(2)} €</div>
+                    <div style={{ display: "flex", gap: 4, justifyContent: "flex-end", marginTop: 4, flexWrap: "wrap" }}>
+                      <span style={css.badge(palette.accent)}>{e.journal}</span>
+                      {e.entityType === "association" && <span style={css.badge(palette.purple)}>ASSO</span>}
+                      {e.fecMatch && <span style={css.badge(palette.orange)}>FEC ✓</span>}
+                      {!e.fecMatch && <span style={{ ...css.badge(palette.blue), border: `1px dashed ${palette.blue}` }}>✦ Nouveau</span>}
+                      {Array.isArray(e.taxes) && e.taxes.length > 0 && (
+                        <span style={css.badge(palette.warn)}>{e.taxes.map(t => t.code || t.nom).join(" + ")}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
 
-            {e.fecMatch && (
-              <div style={{ fontSize: 11, color: palette.orange, background: palette.orangeDim, borderRadius: 8, padding: "4px 10px", marginBottom: 8 }}>
-                🔁 Compte réutilisé depuis le FEC — fournisseur connu ({e.fecMatchNom})
-              </div>
-            )}
+              {!isEditing && e.fecMatch && (
+                <div style={{ fontSize: 11, color: palette.orange, background: palette.orangeDim, borderRadius: 8, padding: "4px 10px", marginBottom: 8 }}>
+                  🔁 Compte réutilisé depuis le FEC — fournisseur connu ({e.fecMatchNom})
+                </div>
+              )}
 
-            {!e.equilibre && (
-              <div style={{ fontSize: 11, color: palette.warn, background: palette.warnDim, borderRadius: 8, padding: "4px 10px", marginBottom: 8 }}>
-                ⚠️ Écart détecté ({e.ecartAvantCorrection > 0 ? "+" : ""}{e.ecartAvantCorrection?.toFixed(2)}€) — corrigé automatiquement sur le compte de charge
-              </div>
-            )}
-            {e.equilibre && (
-              <div style={{ fontSize: 11, color: palette.accent, background: palette.accentDim, borderRadius: 8, padding: "4px 10px", marginBottom: 8 }}>
-                ✓ Écriture équilibrée
-              </div>
-            )}
-
-            <div style={{ overflowX: "auto", margin: "10px -4px" }}>
-              <table style={css.table}>
-                <thead>
-                  <tr>
-                    <th style={css.th}>Compte</th>
-                    <th style={css.th}>Libellé</th>
-                    <th style={{ ...css.th, textAlign: "right" }}>Débit</th>
-                    <th style={{ ...css.th, textAlign: "right" }}>Crédit</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {e.lignes.map((l, i) => (
-                    <tr key={i}>
-                      <td style={css.td}><span style={css.tag}>{l.compte}</span></td>
-                      <td style={{ ...css.td, fontFamily: font, fontSize: 12, color: palette.textMuted, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.libelle}</td>
-                      <td style={{ ...css.td, textAlign: "right", color: l.debit ? palette.text : palette.textDim }}>{l.debit ? l.debit.toFixed(2) : "-"}</td>
-                      <td style={{ ...css.td, textAlign: "right", color: l.credit ? palette.accent : palette.textDim }}>{l.credit ? l.credit.toFixed(2) : "-"}</td>
-                    </tr>
+              {/* Taxes détectées (mode lecture) */}
+              {!isEditing && Array.isArray(e.taxes) && e.taxes.length > 0 && (
+                <div style={{ fontSize: 11, color: palette.warn, background: palette.warnDim, borderRadius: 8, padding: "6px 10px", marginBottom: 8 }}>
+                  🏝️ <strong>Taxes détectées :</strong>{" "}
+                  {e.taxes.map((t, i) => (
+                    <span key={i}>{t.nom}{t.taux ? ` (${t.taux}%)` : ""} = {t.montant?.toFixed(2)}€{i < e.taxes.length - 1 ? " · " : ""}</span>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </div>
+              )}
 
-            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-              <button style={css.btnSmall("ghost")} onClick={() => exportOne(e)}>{Icons.download} CSV</button>
-              <button style={{ ...css.btnSmall("ghost"), color: palette.danger, borderColor: "rgba(248,113,113,0.3)" }} onClick={() => onDelete(e.id)}>{Icons.trash} Supprimer</button>
+              {/* Équilibre */}
+              {isEditing ? (
+                <div style={{ fontSize: 11, borderRadius: 8, padding: "4px 10px", marginBottom: 8,
+                  color: Math.abs(draftDebitTotal - draftCreditTotal) < 0.01 ? palette.accent : palette.danger,
+                  background: Math.abs(draftDebitTotal - draftCreditTotal) < 0.01 ? palette.accentDim : palette.dangerDim }}>
+                  {Math.abs(draftDebitTotal - draftCreditTotal) < 0.01
+                    ? "✓ Écriture équilibrée"
+                    : `⚠️ Écart : ${(draftDebitTotal - draftCreditTotal).toFixed(2)}€ (Débit ${draftDebitTotal.toFixed(2)} / Crédit ${draftCreditTotal.toFixed(2)})`}
+                </div>
+              ) : (
+                !e.equilibre ? (
+                  <div style={{ fontSize: 11, color: palette.warn, background: palette.warnDim, borderRadius: 8, padding: "4px 10px", marginBottom: 8 }}>
+                    ⚠️ Écart détecté ({e.ecartAvantCorrection > 0 ? "+" : ""}{e.ecartAvantCorrection?.toFixed(2)}€) — corrigé automatiquement
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 11, color: palette.accent, background: palette.accentDim, borderRadius: 8, padding: "4px 10px", marginBottom: 8 }}>
+                    ✓ Écriture équilibrée
+                  </div>
+                )
+              )}
+
+              {/* TABLE LIGNES */}
+              <div style={{ overflowX: "auto", margin: "10px -4px" }}>
+                <table style={css.table}>
+                  <thead>
+                    <tr>
+                      <th style={{ ...css.th, width: isEditing ? "22%" : "auto" }}>Compte</th>
+                      <th style={css.th}>Libellé</th>
+                      <th style={{ ...css.th, textAlign: "right", width: 70 }}>Débit</th>
+                      <th style={{ ...css.th, textAlign: "right", width: 70 }}>Crédit</th>
+                      {isEditing && <th style={{ ...css.th, width: 28 }}></th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.lignes.map((l, i) => (
+                      <tr key={i}>
+                        <td style={css.td}>
+                          {isEditing
+                            ? <input style={inputStyle} value={l.compte} onChange={ev => updateDraftLigne(i, "compte", ev.target.value)} placeholder="N° compte" />
+                            : <span style={css.tag}>{l.compte}</span>}
+                        </td>
+                        <td style={{ ...css.td, fontFamily: font, fontSize: 12, color: palette.textMuted, maxWidth: isEditing ? 120 : 140 }}>
+                          {isEditing
+                            ? <input style={{ ...inputStyle, fontFamily: font }} value={l.libelle} onChange={ev => updateDraftLigne(i, "libelle", ev.target.value)} placeholder="Libellé" />
+                            : <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{l.libelle}</span>}
+                        </td>
+                        <td style={{ ...css.td, textAlign: "right", color: l.debit ? palette.text : palette.textDim }}>
+                          {isEditing
+                            ? <input style={{ ...inputStyle, textAlign: "right", width: 60 }} type="number" step="0.01" value={l.debit || ""} onChange={ev => updateDraftLigne(i, "debit", ev.target.value)} placeholder="0.00" />
+                            : (l.debit ? l.debit.toFixed(2) : "-")}
+                        </td>
+                        <td style={{ ...css.td, textAlign: "right", color: l.credit ? palette.accent : palette.textDim }}>
+                          {isEditing
+                            ? <input style={{ ...inputStyle, textAlign: "right", width: 60 }} type="number" step="0.01" value={l.credit || ""} onChange={ev => updateDraftLigne(i, "credit", ev.target.value)} placeholder="0.00" />
+                            : (l.credit ? l.credit.toFixed(2) : "-")}
+                        </td>
+                        {isEditing && (
+                          <td style={{ ...css.td, textAlign: "center", padding: "6px 2px" }}>
+                            <button style={{ ...css.btnSmall("ghost"), padding: "2px 5px", color: palette.danger, border: "none" }} onClick={() => removeDraftLigne(i)}>
+                              {Icons.x}
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {isEditing && (
+                <button style={{ ...css.btnSmall("ghost"), marginTop: 8, width: "100%", justifyContent: "center", borderStyle: "dashed" }} onClick={addDraftLigne}>
+                  {Icons.plus} Ajouter une ligne
+                </button>
+              )}
+
+              {/* ACTIONS */}
+              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                {isEditing ? (
+                  <>
+                    <button style={{ ...css.btnSmall("accent"), flex: 1, justifyContent: "center", padding: "8px 12px" }} onClick={saveEdit}>
+                      {Icons.check} Enregistrer
+                    </button>
+                    <button style={{ ...css.btnSmall("ghost"), flex: 1, justifyContent: "center", padding: "8px 12px" }} onClick={cancelEdit}>
+                      ✕ Annuler
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button style={{ ...css.btnSmall("ghost"), color: palette.blue, borderColor: `${palette.blue}44` }} onClick={() => startEdit(e)}>
+                      ✏️ Modifier
+                    </button>
+                    <button style={css.btnSmall("ghost")} onClick={() => exportOne(e)}>{Icons.download} CSV</button>
+                    <button style={{ ...css.btnSmall("ghost"), color: palette.danger, borderColor: "rgba(248,113,113,0.3)" }} onClick={() => onDelete(e.id)}>{Icons.trash} Supprimer</button>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );
@@ -1797,7 +1987,7 @@ export default function ComptaScan({ user, onHome }) {
 
       <div style={{ animation: "fadeIn 0.3s ease" }} key={`${tab}-${entityType}`}>
         {tab === "scan" && <ScanView planComptable={planComptable} entityType={entityType} onEcrituresGenerated={handleNewEcritures} fecData={fecData} />}
-        {tab === "ecritures" && <EcrituresView ecritures={ecritures} entityType={entityType} onDelete={(id) => { setEcritures((p) => p.filter((e) => e.id !== id)); showToast("Écriture supprimée"); }} />}
+        {tab === "ecritures" && <EcrituresView ecritures={ecritures} entityType={entityType} onDelete={(id) => { setEcritures((p) => p.filter((e) => e.id !== id)); showToast("Écriture supprimée"); }} onUpdate={(updated) => { setEcritures((p) => p.map((e) => e.id === updated.id ? updated : e)); showToast("Écriture modifiée"); }} />}
         {tab === "fec" && <FecView fecData={fecData} setFecData={setFecData} />}
         {tab === "plan" && <PlanComptableView planComptable={planComptable} setPlanComptable={setPlanComptable} entityType={entityType} />}
       </div>
