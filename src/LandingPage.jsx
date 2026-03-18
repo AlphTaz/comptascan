@@ -27,6 +27,11 @@ function Navbar({ user, onGoApp, onGoAccount, onLogin }) {
           </>
         ) : (
           <>
+            <a href="tarifs-comptascan.html" style={{ padding: "7px 14px", borderRadius: 8, border: `1px solid ${palette.border}`, background: "transparent", color: palette.textMuted, fontSize: 13, fontWeight: 500, textDecoration: "none", transition: "color 0.15s" }}
+              onMouseOver={e => e.currentTarget.style.color = palette.accent}
+              onMouseOut={e => e.currentTarget.style.color = palette.textMuted}>
+              Tarifs
+            </a>
             <button onClick={onLogin} style={{ padding: "7px 14px", borderRadius: 8, border: `1px solid ${palette.border}`, background: "transparent", color: palette.textMuted, fontSize: 13, fontWeight: 500 }}>
               Connexion
             </button>
@@ -74,6 +79,11 @@ function Hero({ user, onGoApp, onLogin }) {
             onMouseOver={e => { e.currentTarget.style.borderColor = palette.borderLight; e.currentTarget.style.color = palette.text; }}
             onMouseOut={e => { e.currentTarget.style.borderColor = palette.border; e.currentTarget.style.color = palette.textMuted; }}>
             Voir les fonctionnalités ↓
+          </a>
+          <a href="tarifs-comptascan.html" style={{ padding: "14px 24px", borderRadius: 12, border: `1px solid ${palette.accentGlow}`, background: palette.accentDim, color: palette.accent, fontSize: 15, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 6, transition: "all 0.2s", textDecoration: "none" }}
+            onMouseOver={e => { e.currentTarget.style.background = "rgba(62,207,142,0.18)"; }}
+            onMouseOut={e => { e.currentTarget.style.background = palette.accentDim; }}>
+            Voir les tarifs →
           </a>
         </div>
 
