@@ -2051,12 +2051,6 @@ export default function ComptaScan({ user, onHome }) {
         </div>
 
 
-          {fecData.length > 0 && (
-            <div style={{ fontSize: 10, color: palette.orange, background: palette.orangeDim, padding: "3px 8px", borderRadius: 20, fontWeight: 700, letterSpacing: 0.3 }}>
-              FEC
-            </div>
-          )}
-
           {/* Bouton Accueil */}
           {onHome && (
             <button
