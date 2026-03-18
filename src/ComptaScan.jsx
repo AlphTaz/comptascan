@@ -631,10 +631,6 @@ const ENTITY_CONFIG = {
 // ─── STYLES ───
 const font = `'DM Sans', 'Avenir', sans-serif`;
 const mono = `'DM Mono', 'Fira Code', monospace`;
-// ─── ALIASES (compatibilité composants greffés) ───
-// Les composants CompteSelector / LigneModal / EcritureModal / EcrituresView
-// utilisent les noms courts p / s / Icon — on les définit après palette/css/Icons.
-
 const palette = {
   bg: "#0C0F14", surface: "#151921", surfaceHover: "#1C2230",
   border: "#252D3A", borderLight: "#2E3848",
@@ -686,31 +682,6 @@ const Icons = {
   check: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={palette.accent} strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>),
   fec: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg>),
   brain: (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M9.5 2A2.5 2.5 0 017 4.5v0A2.5 2.5 0 014.5 7v0A2.5 2.5 0 012 9.5v5A2.5 2.5 0 004.5 17v0A2.5 2.5 0 007 19.5v0A2.5 2.5 0 009.5 22h5a2.5 2.5 0 002.5-2.5v0A2.5 2.5 0 0019.5 17v0A2.5 2.5 0 0022 14.5v-5A2.5 2.5 0 0019.5 7v0A2.5 2.5 0 0017 4.5v0A2.5 2.5 0 0014.5 2h-5z"/></svg>),
-};
-
-// ─── ALIASES noms courts → noms __2__ ───
-const p    = palette;
-const Icon = {
-  scan:   Icons.scan,
-  dl:     Icons.download,
-  trash:  Icons.trash,
-  plus:   Icons.plus,
-  x:      Icons.x,
-  check:  Icons.check,
-  upload: Icons.upload,
-  edit: (<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>),
-  search: (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>),
-  chev:   (<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>),
-};
-const s = {
-  card:    css.card,
-  btn:     css.btn,
-  btnSm:   css.btnSmall,
-  input:   css.input,
-  tag:     css.tag,
-  badge:   css.badge,
-  infoBox: css.infoBox,
-  spinner: css.spinner,
 };
 
 // ─── CSV / FEC UTILS ───
@@ -1163,320 +1134,6 @@ function FecView({ fecData, setFecData }) {
   );
 }
 
-function CompteSelector({ value, onChange, planComptable, onAddCompte, placeholder="Sélectionner un compte..." }) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [showAdd, setShowAdd] = useState(false);
-  const [newNum, setNewNum] = useState("");
-  const [newLib, setNewLib] = useState("");
-  const [newType, setNewType] = useState("charge");
-  const ref = useRef(); const inputRef = useRef();
-
-  useEffect(() => { if (open && inputRef.current) inputRef.current.focus(); }, [open]);
-  useEffect(() => {
-    const h = e => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setShowAdd(false); setSearch(""); } };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
-
-  const filtered = planComptable.filter(c => c.compte.includes(search) || c.libelle.toLowerCase().includes(search.toLowerCase())).slice(0, 50);
-  const selected = planComptable.find(c => c.compte === value);
-
-  const handleAdd = () => {
-    if (!newNum.trim() || !newLib.trim()) return;
-    onAddCompte({ compte: newNum.trim(), libelle: newLib.trim(), type: newType });
-    onChange(newNum.trim());
-    setNewNum(""); setNewLib(""); setShowAdd(false); setOpen(false); setSearch("");
-  };
-
-  return (
-    <div ref={ref} style={{ position:"relative" }}>
-      <div onClick={() => { setOpen(o=>!o); setSearch(""); setShowAdd(false); }}
-        style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 11px", borderRadius:9, border:`1px solid ${open?p.accent:p.border}`, background:p.bg, cursor:"pointer", gap:8, transition:"border-color 0.15s" }}>
-        <div style={{ flex:1, minWidth:0 }}>
-          {selected ? (
-            <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-              <span style={{ ...s.tag, flexShrink:0 }}>{selected.compte}</span>
-              <span style={{ fontSize:12, color:p.textMuted, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{selected.libelle}</span>
-            </div>
-          ) : <span style={{ fontSize:12, color:p.textDim }}>{value||placeholder}</span>}
-        </div>
-        <span style={{ color:p.textDim, flexShrink:0, transition:"transform 0.15s", transform:open?"rotate(180deg)":"none" }}>{Icon.chev}</span>
-      </div>
-
-      {open && (
-        <div style={{ position:"absolute", top:"calc(100% + 4px)", left:0, right:0, background:p.surface2, border:`1px solid ${p.borderLight}`, borderRadius:10, zIndex:2000, boxShadow:"0 8px 32px rgba(0,0,0,0.55)", overflow:"hidden" }}>
-          {/* Search */}
-          <div style={{ padding:"8px 10px", borderBottom:`1px solid ${p.border}`, display:"flex", alignItems:"center", gap:7 }}>
-            <span style={{ color:p.textDim }}>{Icon.search}</span>
-            <input ref={inputRef} style={{ flex:1, background:"transparent", border:"none", outline:"none", color:p.text, fontSize:12, fontFamily:font }} placeholder="N° ou libellé..." value={search} onChange={e=>setSearch(e.target.value)} />
-            {search && <button onClick={()=>setSearch("")} style={{ background:"none", border:"none", color:p.textDim, cursor:"pointer", padding:0 }}>{Icon.x}</button>}
-          </div>
-
-          {/* List */}
-          <div style={{ maxHeight:220, overflowY:"auto" }}>
-            {filtered.length===0
-              ? <div style={{ padding:"14px 12px", textAlign:"center", color:p.textDim, fontSize:12 }}>Aucun compte trouvé</div>
-              : filtered.map(c => (
-                <div key={c.compte}
-                  onClick={() => { onChange(c.compte); setOpen(false); setSearch(""); }}
-                  style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 12px", cursor:"pointer", background:c.compte===value?p.accentDim:"transparent", borderBottom:`1px solid ${p.border}18`, transition:"background 0.1s" }}
-                  onMouseOver={e => { if(c.compte!==value) e.currentTarget.style.background=`${p.white}06`; }}
-                  onMouseOut={e => { if(c.compte!==value) e.currentTarget.style.background="transparent"; }}
-                >
-                  <span style={{ ...s.tag, flexShrink:0, minWidth:54, textAlign:"center" }}>{c.compte}</span>
-                  <span style={{ flex:1, fontSize:12, color:p.text, lineHeight:1.3 }}>{c.libelle}</span>
-                  <span style={{ fontSize:9, color:typeColor[c.type]||p.textDim, textTransform:"uppercase", flexShrink:0, fontWeight:700 }}>{c.type}</span>
-                  {c.compte===value && <span style={{ color:p.accent }}>{Icon.check}</span>}
-                </div>
-              ))
-            }
-          </div>
-
-          {/* Add */}
-          {!showAdd
-            ? <div style={{ padding:"8px 10px", borderTop:`1px solid ${p.border}` }}>
-                <button onClick={()=>{ setShowAdd(true); setNewNum(search.match(/^\d+$/)?search:""); }} style={{ ...s.btnSm("ghost"), width:"100%", justifyContent:"center", padding:"7px", borderStyle:"dashed", color:p.accent, borderColor:`${p.accent}44` }}>
-                  {Icon.plus} Ajouter un compte au plan
-                </button>
-              </div>
-            : <div style={{ padding:"10px", borderTop:`1px solid ${p.border}`, background:p.accentDim }}>
-                <div style={{ fontSize:11, fontWeight:600, color:p.accent, marginBottom:7 }}>Nouveau compte</div>
-                <div style={{ display:"flex", gap:5, marginBottom:6 }}>
-                  <input style={{ ...s.input, width:90, fontSize:12, padding:"6px 8px" }} placeholder="N°" value={newNum} onChange={e=>setNewNum(e.target.value)} />
-                  <input style={{ ...s.input, flex:1, fontSize:12, padding:"6px 8px" }} placeholder="Libellé" value={newLib} onChange={e=>setNewLib(e.target.value)} />
-                </div>
-                <div style={{ display:"flex", gap:5 }}>
-                  <select style={{ ...s.input, flex:1, fontSize:12, padding:"6px 8px" }} value={newType} onChange={e=>setNewType(e.target.value)}>
-                    {["charge","produit","actif","passif","emploi_vol","ressource_vol"].map(t=><option key={t} value={t}>{t}</option>)}
-                  </select>
-                  <button onClick={handleAdd} style={{ ...s.btnSm("accent"), padding:"6px 12px" }}>{Icon.check} OK</button>
-                  <button onClick={()=>setShowAdd(false)} style={{ ...s.btnSm("ghost"), padding:"6px 10px" }}>{Icon.x}</button>
-                </div>
-              </div>
-          }
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── LIGNE MODAL ───
-function LigneModal({ ligne, index, planComptable, onAddCompte, onSave, onClose }) {
-  const [draft, setDraft] = useState({ ...ligne });
-  const initMode = (parseFloat(ligne.debit)||0) > 0 ? "debit" : "credit";
-  const [mode, setMode] = useState(initMode);
-  const montant = mode==="debit" ? (parseFloat(draft.debit)||0) : (parseFloat(draft.credit)||0);
-
-  const setMontant = val => {
-    const n = parseFloat(val)||0;
-    setDraft(d => mode==="debit" ? {...d, debit:n, credit:0} : {...d, credit:n, debit:0});
-  };
-  const switchMode = m => {
-    const cur = m==="debit" ? (parseFloat(draft.credit)||0) : (parseFloat(draft.debit)||0);
-    setMode(m);
-    setDraft(d => m==="debit" ? {...d, debit:cur, credit:0} : {...d, credit:cur, debit:0});
-  };
-
-  const valid = draft.compte && ((parseFloat(draft.debit)||0)+(parseFloat(draft.credit)||0))>0;
-
-  return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.75)", backdropFilter:"blur(5px)", zIndex:6000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}
-      onClick={onClose}>
-      <div style={{ background:p.surface, borderRadius:18, border:`1px solid ${p.borderLight}`, width:"100%", maxWidth:420, boxShadow:`0 24px 60px rgba(0,0,0,0.65), 0 0 0 1px ${p.accent}22` }}
-        onClick={e=>e.stopPropagation()}>
-
-        {/* Header */}
-        <div style={{ padding:"15px 18px", borderBottom:`1px solid ${p.border}`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <div>
-            <div style={{ fontSize:14, fontWeight:700, color:p.white }}>Modifier la ligne</div>
-            <div style={{ fontSize:11, color:p.textDim, marginTop:1 }}>Ligne {index+1}</div>
-          </div>
-          <button onClick={onClose} style={{ ...s.btnSm("ghost"), padding:"5px 7px" }}>{Icon.x}</button>
-        </div>
-
-        {/* Body */}
-        <div style={{ padding:"18px" }}>
-          <div style={{ marginBottom:14 }}>
-            <label style={{ fontSize:10, fontWeight:700, color:p.textMuted, textTransform:"uppercase", letterSpacing:0.9, display:"block", marginBottom:6 }}>Compte</label>
-            <CompteSelector value={draft.compte} onChange={v=>setDraft(d=>({...d,compte:v}))} planComptable={planComptable} onAddCompte={onAddCompte} />
-          </div>
-
-          <div style={{ marginBottom:14 }}>
-            <label style={{ fontSize:10, fontWeight:700, color:p.textMuted, textTransform:"uppercase", letterSpacing:0.9, display:"block", marginBottom:6 }}>Libellé</label>
-            <input style={s.input} value={draft.libelle||""} onChange={e=>setDraft(d=>({...d,libelle:e.target.value}))} placeholder="Libellé de la ligne..." />
-          </div>
-
-          <div style={{ marginBottom:18 }}>
-            <label style={{ fontSize:10, fontWeight:700, color:p.textMuted, textTransform:"uppercase", letterSpacing:0.9, display:"block", marginBottom:6 }}>Montant</label>
-            <div style={{ display:"flex", gap:4, marginBottom:8 }}>
-              {[["debit","Débit",p.blue],["credit","Crédit",p.accent]].map(([m,label,c])=>(
-                <button key={m} onClick={()=>switchMode(m)} style={{ flex:1, padding:"8px", borderRadius:8, border:`1px solid ${mode===m?c:p.border}`, background:mode===m?`${c}16`:"transparent", color:mode===m?c:p.textMuted, fontSize:12, fontWeight:700, fontFamily:font, cursor:"pointer", transition:"all 0.15s" }}>{label}</button>
-              ))}
-            </div>
-            <div style={{ position:"relative" }}>
-              <input type="number" step="0.01" min="0" style={{ ...s.input, fontFamily:mono, fontSize:20, fontWeight:700, textAlign:"right", paddingRight:40, color:mode==="credit"?p.accent:p.blue }} value={montant||""} onChange={e=>setMontant(e.target.value)} placeholder="0.00" />
-              <span style={{ position:"absolute", right:13, top:"50%", transform:"translateY(-50%)", color:p.textDim, fontSize:14, fontWeight:600, pointerEvents:"none" }}>€</span>
-            </div>
-          </div>
-
-          {/* Preview pill */}
-          {draft.compte && montant>0 && (
-            <div style={{ background:p.bg, borderRadius:10, padding:"9px 13px", marginBottom:16, border:`1px solid ${p.border}`, display:"flex", alignItems:"center", gap:8 }}>
-              <span style={s.tag}>{draft.compte}</span>
-              <span style={{ flex:1, fontSize:11, color:p.textMuted, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{draft.libelle||"—"}</span>
-              <span style={{ fontFamily:mono, fontSize:12, fontWeight:700, color:mode==="credit"?p.accent:p.blue, flexShrink:0 }}>{mode==="debit"?"D":"C"} {montant.toFixed(2)} €</span>
-            </div>
-          )}
-
-          <div style={{ display:"flex", gap:8 }}>
-            <button onClick={onClose} style={{ ...s.btn("ghost"), flex:1, padding:"10px" }}>Annuler</button>
-            <button onClick={()=>{ if(valid){onSave(draft);onClose();} }} disabled={!valid}
-              style={{ ...s.btn("primary"), flex:2, padding:"10px", opacity:valid?1:0.4, cursor:valid?"pointer":"not-allowed" }}>
-              {Icon.check} Enregistrer
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── ECRITURE MODAL (bottom sheet) ───
-function EcritureModal({ ecriture, planComptable, onAddCompte, onSave, onClose }) {
-  const [draft, setDraft] = useState(JSON.parse(JSON.stringify(ecriture)));
-  const [editingLigne, setEditingLigne] = useState(null);
-
-  const { d, c, ecart, ok } = checkBalance(draft.lignes);
-
-  const updateLigne = (i, l) => setDraft(d => { const ls=[...d.lignes]; ls[i]=l; return {...d,lignes:ls}; });
-  const deleteLigne = i => setDraft(d => ({ ...d, lignes:d.lignes.filter((_,j)=>j!==i) }));
-  const addLigne = () => {
-    const idx = draft.lignes.length;
-    setDraft(d => ({ ...d, lignes:[...d.lignes, { compte:"", libelle:"", debit:0, credit:0 }] }));
-    setTimeout(()=>setEditingLigne(idx), 30);
-  };
-  const handleSave = () => {
-    const ttc = draft.lignes.reduce((s,l)=>s+(parseFloat(l.credit)||0),0);
-    const { ok:eq, ecart:e, lignes } = (() => {
-      const ls=[...draft.lignes];
-      const D=ls.reduce((s,l)=>s+(parseFloat(l.debit)||0),0);
-      const C=ls.reduce((s,l)=>s+(parseFloat(l.credit)||0),0);
-      const ec=Math.round((D-C)*100)/100;
-      if(Math.abs(ec)<0.01) return {ok:true,ecart:0,lignes:ls};
-      const idx=ls.findIndex(l=>(parseFloat(l.debit)||0)>0);
-      if(idx>=0) ls[idx]={...ls[idx],debit:Math.round(((parseFloat(ls[idx].debit)||0)-ec)*100)/100};
-      return {ok:false,ecart:ec,lignes:ls};
-    })();
-    onSave({ ...draft, montantTTC:Math.round(ttc*100)/100, lignes, equilibre:eq });
-    onClose();
-  };
-
-  return (
-    <>
-      <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", backdropFilter:"blur(4px)", zIndex:4000, display:"flex", alignItems:"flex-end", justifyContent:"center" }}
-        onClick={onClose}>
-        <div style={{ background:p.surface, borderRadius:"18px 18px 0 0", border:`1px solid ${p.borderLight}`, width:"100%", maxWidth:520, maxHeight:"88vh", display:"flex", flexDirection:"column", boxShadow:"0 -20px 60px rgba(0,0,0,0.5)" }}
-          onClick={e=>e.stopPropagation()}>
-
-          {/* Header */}
-          <div style={{ padding:"16px 20px", borderBottom:`1px solid ${p.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
-            <div>
-              <div style={{ fontSize:14, fontWeight:700, color:p.white }}>Modifier l'écriture</div>
-              <div style={{ fontSize:11, color:p.textDim, marginTop:1 }}>{draft.fournisseur} · {draft.piece}</div>
-            </div>
-            <button onClick={onClose} style={{ ...s.btnSm("ghost"), padding:"5px 7px" }}>{Icon.x}</button>
-          </div>
-
-          {/* Infos */}
-          <div style={{ padding:"14px 20px", borderBottom:`1px solid ${p.border}`, flexShrink:0 }}>
-            <div style={{ display:"flex", gap:8, marginBottom:8 }}>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:10, color:p.textDim, marginBottom:4 }}>FOURNISSEUR</div>
-                <input style={{ ...s.input, fontSize:12 }} value={draft.fournisseur} onChange={e=>setDraft(d=>({...d,fournisseur:e.target.value}))} />
-              </div>
-              <div style={{ width:118 }}>
-                <div style={{ fontSize:10, color:p.textDim, marginBottom:4 }}>DATE</div>
-                <input style={{ ...s.input, fontSize:12 }} type="date" value={draft.date} onChange={e=>setDraft(d=>({...d,date:e.target.value}))} />
-              </div>
-            </div>
-            <div style={{ display:"flex", gap:8 }}>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:10, color:p.textDim, marginBottom:4 }}>N° PIÈCE</div>
-                <input style={{ ...s.input, fontSize:12 }} value={draft.piece} onChange={e=>setDraft(d=>({...d,piece:e.target.value}))} />
-              </div>
-              <div style={{ width:70 }}>
-                <div style={{ fontSize:10, color:p.textDim, marginBottom:4 }}>JOURNAL</div>
-                <input style={{ ...s.input, fontSize:12 }} value={draft.journal} onChange={e=>setDraft(d=>({...d,journal:e.target.value}))} />
-              </div>
-            </div>
-          </div>
-
-          {/* Lignes */}
-          <div style={{ flex:1, overflowY:"auto", padding:"14px 20px" }}>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:p.textMuted, textTransform:"uppercase", letterSpacing:0.8 }}>Lignes ({draft.lignes.length})</div>
-              <div style={{ fontSize:11, fontFamily:mono, color:ok?p.accent:p.danger, background:ok?p.accentDim:p.dangerDim, padding:"3px 9px", borderRadius:20, fontWeight:700 }}>
-                {ok ? "✓ Équilibré" : `Écart ${ecart>0?"+":""}${ecart.toFixed(2)}€`}
-              </div>
-            </div>
-
-            {draft.lignes.map((l,i) => {
-              const deb = parseFloat(l.debit)||0;
-              const cred = parseFloat(l.credit)||0;
-              const side = deb>0 ? "D" : "C";
-              const montant = deb>0 ? deb : cred;
-              const lineColor = side==="C" ? p.accent : p.blue;
-              const info = planComptable.find(c=>c.compte===l.compte);
-              return (
-                <div key={i} onClick={()=>setEditingLigne(i)}
-                  style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 13px", borderRadius:10, border:`1px solid ${p.border}`, marginBottom:6, cursor:"pointer", background:p.surface, transition:"all 0.12s" }}
-                  onMouseOver={e=>{e.currentTarget.style.borderColor=`${p.accent}55`;e.currentTarget.style.background=p.accentDim;}}
-                  onMouseOut={e=>{e.currentTarget.style.borderColor=p.border;e.currentTarget.style.background=p.surface;}}>
-                  <div style={{ flexShrink:0 }}>
-                    {l.compte ? <span style={s.tag}>{l.compte}</span> : <span style={{ ...s.tag, background:p.dangerDim, color:p.danger }}>???</span>}
-                  </div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:12, color:p.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{l.libelle||<span style={{color:p.textDim}}>Sans libellé</span>}</div>
-                    {info && <div style={{ fontSize:10, color:p.textDim, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{info.libelle}</div>}
-                  </div>
-                  <span style={{ fontFamily:mono, fontSize:13, fontWeight:700, color:lineColor, flexShrink:0 }}>{side} {montant.toFixed(2)}</span>
-                  <span style={{ color:p.textDim, flexShrink:0, opacity:0.7 }}>{Icon.edit}</span>
-                  <button onClick={e=>{e.stopPropagation();deleteLigne(i);}} style={{ ...s.btnSm("ghost"), padding:"3px 5px", color:p.danger, border:"none", flexShrink:0 }}>{Icon.trash}</button>
-                </div>
-              );
-            })}
-
-            <button onClick={addLigne} style={{ ...s.btnSm("ghost"), width:"100%", justifyContent:"center", padding:"10px", borderStyle:"dashed", color:p.accent, borderColor:`${p.accent}44`, marginTop:4 }}>
-              {Icon.plus} Ajouter une ligne
-            </button>
-          </div>
-
-          {/* Footer */}
-          <div style={{ padding:"12px 20px", borderTop:`1px solid ${p.border}`, display:"flex", gap:8, flexShrink:0 }}>
-            <button onClick={onClose} style={{ ...s.btn("ghost"), flex:1, padding:"10px" }}>Annuler</button>
-            <button onClick={handleSave} style={{ ...s.btn("primary"), flex:2, padding:"10px" }}>{Icon.check} Enregistrer</button>
-          </div>
-        </div>
-      </div>
-
-      {/* Nested ligne modal */}
-      {editingLigne!==null && draft.lignes[editingLigne]!==undefined && (
-        <LigneModal
-          ligne={draft.lignes[editingLigne]}
-          index={editingLigne}
-          planComptable={planComptable}
-          onAddCompte={onAddCompte}
-          onSave={l=>updateLigne(editingLigne,l)}
-          onClose={()=>setEditingLigne(null)}
-        />
-      )}
-    </>
-  );
-}
-
-// ─── SCAN VIEW ───
-
 // ─── CAMERA VIEW ───
 // Rendu via un portail DOM sur document.body pour couvrir tout l'écran en PWA Android
 function CameraView({ onCapture, onClose }) {
@@ -1577,7 +1234,7 @@ function CameraView({ onCapture, onClose }) {
 }
 
 // ─── SCAN VIEW ───
-function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData, noTokens }) {
+function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData }) {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("Analyse en cours...");
@@ -1768,9 +1425,9 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData, no
 
       <div style={{ marginTop: 18 }}>
         <button
-          style={{ ...css.btn("primary"), opacity: (images.length === 0 || noTokens) ? 0.35 : 1, cursor: (images.length === 0 || noTokens) ? "not-allowed" : "pointer" }}
+          style={{ ...css.btn("primary"), opacity: images.length === 0 ? 0.35 : 1, cursor: images.length === 0 ? "not-allowed" : "pointer" }}
           onClick={analyze}
-          disabled={loading || images.length === 0 || noTokens}
+          disabled={loading || images.length === 0}
         >
           {loading
             ? (<><div style={css.spinner} /> {loadingMsg}</>)
@@ -1781,11 +1438,6 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData, no
         </button>
       </div>
 
-      {noTokens && (
-        <div style={{ ...css.card, marginTop: 14, borderColor: palette.danger, background: palette.dangerDim, color: palette.danger, fontSize: 13 }}>
-          Tokens épuisés — <a href="tarifs.html" style={{ color: palette.danger, fontWeight: 700 }}>Passer au plan supérieur →</a>
-        </div>
-      )}
       {error && (
         <div style={{ ...css.card, marginTop: 14, borderColor: palette.danger, background: palette.dangerDim, color: palette.danger, fontSize: 13 }}>
           {error}
@@ -1795,93 +1447,410 @@ function ScanView({ planComptable, entityType, onEcrituresGenerated, fecData, no
   );
 }
 
-// ─── ECRITURES VIEW ───
-function EcrituresView({ ecritures, planComptable, onAddCompte, onDelete, onUpdate }) {
-  const [editingId, setEditingId] = useState(null);
-  const totalTTC = ecritures.reduce((s,e)=>s+e.montantTTC, 0);
-  const editing = ecritures.find(e=>e.id===editingId);
 
-  if (!ecritures.length) return (
-    <div style={{ padding:"18px" }}>
-      <div style={{ fontSize:11, fontWeight:700, color:p.textMuted, textTransform:"uppercase", letterSpacing:1.2, marginBottom:14 }}>Écritures comptables</div>
-      <div style={{ textAlign:"center", padding:"40px 20px", color:p.textDim, fontSize:13 }}>
-        <div style={{ fontSize:28, marginBottom:10, opacity:0.3 }}>📒</div>
-        Aucune écriture. Importez des factures dans l'onglet Scan.
+// ─── COMPTE SELECTOR ───
+function CompteSelector({ value, onChange, planComptable, placeholder = "Sélectionner un compte..." }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef();
+  const inputRef = useRef();
+
+  useEffect(() => { if (open && inputRef.current) inputRef.current.focus(); }, [open]);
+  useEffect(() => {
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setSearch(""); } };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const filtered = planComptable
+    .filter(c => c.compte.includes(search) || c.libelle.toLowerCase().includes(search.toLowerCase()))
+    .slice(0, 60);
+  const selected = planComptable.find(c => c.compte === value);
+
+  const chevSvg = (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+  );
+  const searchSvg = (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+  );
+
+  const typeColors = {
+    charge: palette.orange, produit: palette.accent,
+    actif: palette.blue, passif: palette.purple,
+    emploi_vol: palette.warn, ressource_vol: palette.warn,
+  };
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      {/* Trigger */}
+      <div
+        onClick={() => { setOpen(o => !o); setSearch(""); }}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "9px 12px", borderRadius: 10,
+          border: `1px solid ${open ? palette.accent : palette.border}`,
+          background: palette.bg, cursor: "pointer", gap: 8,
+          transition: "border-color 0.15s",
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {selected ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <span style={css.tag}>{selected.compte}</span>
+              <span style={{ fontSize: 12, color: palette.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {selected.libelle}
+              </span>
+            </div>
+          ) : (
+            <span style={{ fontSize: 12, color: palette.textDim }}>{value || placeholder}</span>
+          )}
+        </div>
+        <span style={{ color: palette.textDim, flexShrink: 0, transition: "transform 0.15s", transform: open ? "rotate(180deg)" : "none" }}>
+          {chevSvg}
+        </span>
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+          background: palette.surface, border: `1px solid ${palette.borderLight}`,
+          borderRadius: 10, zIndex: 9000,
+          boxShadow: "0 8px 32px rgba(0,0,0,0.55)", overflow: "hidden",
+        }}>
+          {/* Search */}
+          <div style={{ padding: "8px 10px", borderBottom: `1px solid ${palette.border}`, display: "flex", alignItems: "center", gap: 7 }}>
+            <span style={{ color: palette.textDim, flexShrink: 0 }}>{searchSvg}</span>
+            <input
+              ref={inputRef}
+              style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: palette.text, fontSize: 12, fontFamily: font }}
+              placeholder="N° ou libellé..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {search && (
+              <button onClick={() => setSearch("")} style={{ background: "none", border: "none", color: palette.textDim, cursor: "pointer", padding: 0, lineHeight: 1 }}>✕</button>
+            )}
+          </div>
+          {/* List */}
+          <div style={{ maxHeight: 230, overflowY: "auto" }}>
+            {filtered.length === 0 ? (
+              <div style={{ padding: "14px 12px", textAlign: "center", color: palette.textDim, fontSize: 12 }}>Aucun compte trouvé</div>
+            ) : filtered.map(c => (
+              <div
+                key={c.compte}
+                onClick={() => { onChange(c.compte); setOpen(false); setSearch(""); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "9px 12px", cursor: "pointer",
+                  background: c.compte === value ? palette.accentDim : "transparent",
+                  borderBottom: `1px solid ${palette.border}18`,
+                  transition: "background 0.1s",
+                }}
+                onMouseOver={e => { if (c.compte !== value) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+                onMouseOut={e => { if (c.compte !== value) e.currentTarget.style.background = "transparent"; }}
+              >
+                <span style={{ ...css.tag, flexShrink: 0, minWidth: 58, textAlign: "center" }}>{c.compte}</span>
+                <span style={{ flex: 1, fontSize: 12, color: palette.text, lineHeight: 1.3 }}>{c.libelle}</span>
+                <span style={{ fontSize: 9, color: typeColors[c.type] || palette.textDim, textTransform: "uppercase", fontWeight: 700, flexShrink: 0 }}>{c.type}</span>
+                {c.compte === value && (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={palette.accent} strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ─── ECRITURE MODAL ───
+function EcritureModal({ ecriture, planComptable, onSave, onClose }) {
+  const [draft, setDraft] = useState(JSON.parse(JSON.stringify(ecriture)));
+
+  const totalD = draft.lignes.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0);
+  const totalC = draft.lignes.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
+  const ecart  = Math.round((totalD - totalC) * 100) / 100;
+  const equilibre = Math.abs(ecart) < 0.01;
+
+  const setLigne = (i, field, val) =>
+    setDraft(d => {
+      const ls = [...d.lignes];
+      ls[i] = { ...ls[i], [field]: (field === "debit" || field === "credit") ? (parseFloat(val) || 0) : val };
+      return { ...d, lignes: ls };
+    });
+
+  const delLigne = i => setDraft(d => ({ ...d, lignes: d.lignes.filter((_, j) => j !== i) }));
+
+  const addLigne = () =>
+    setDraft(d => ({ ...d, lignes: [...d.lignes, { compte: "", libelle: "", debit: 0, credit: 0 }] }));
+
+  const handleSave = () => {
+    const ttc = draft.lignes.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
+    onSave({ ...draft, montantTTC: Math.round(ttc * 100) / 100, equilibre });
+    onClose();
+  };
+
+  const editSvg = <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)", zIndex: 8000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: palette.surface, borderRadius: 18, border: `1px solid ${palette.borderLight}`, width: "100%", maxWidth: 500, maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.6)" }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* ── Header ── */}
+        <div style={{ padding: "15px 20px", borderBottom: `1px solid ${palette.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: palette.white }}>{editSvg} &nbsp;Modifier l'écriture</div>
+            <div style={{ fontSize: 11, color: palette.textDim, marginTop: 2 }}>{draft.fournisseur} · {draft.piece}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: `1px solid ${palette.border}`, borderRadius: 7, padding: "4px 8px", color: palette.textMuted, cursor: "pointer", fontSize: 14, lineHeight: 1 }}>✕</button>
+        </div>
+
+        {/* ── Infos générales ── */}
+        <div style={{ padding: "14px 20px", borderBottom: `1px solid ${palette.border}`, flexShrink: 0 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 10, color: palette.textDim, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>Fournisseur</div>
+              <input style={{ ...css.input, fontSize: 12, padding: "8px 11px" }} value={draft.fournisseur} onChange={e => setDraft(d => ({ ...d, fournisseur: e.target.value }))} />
+            </div>
+            <div style={{ width: 120 }}>
+              <div style={{ fontSize: 10, color: palette.textDim, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>Date</div>
+              <input type="date" style={{ ...css.input, fontSize: 12, padding: "8px 11px" }} value={draft.date} onChange={e => setDraft(d => ({ ...d, date: e.target.value }))} />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 10, color: palette.textDim, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>N° Pièce</div>
+              <input style={{ ...css.input, fontSize: 12, padding: "8px 11px" }} value={draft.piece} onChange={e => setDraft(d => ({ ...d, piece: e.target.value }))} />
+            </div>
+            <div style={{ width: 80 }}>
+              <div style={{ fontSize: 10, color: palette.textDim, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>Journal</div>
+              <input style={{ ...css.input, fontSize: 12, padding: "8px 11px" }} value={draft.journal} onChange={e => setDraft(d => ({ ...d, journal: e.target.value }))} />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Lignes ── */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px" }}>
+          {/* En-tête équilibre */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: palette.textMuted, textTransform: "uppercase", letterSpacing: 0.8 }}>
+              Lignes ({draft.lignes.length})
+            </div>
+            <div style={{ fontSize: 11, fontFamily: mono, fontWeight: 700, padding: "3px 10px", borderRadius: 20,
+              color: equilibre ? palette.accent : palette.danger,
+              background: equilibre ? palette.accentDim : palette.dangerDim,
+            }}>
+              {equilibre ? "✓ Équilibré" : `Écart ${ecart > 0 ? "+" : ""}${ecart.toFixed(2)} €`}
+            </div>
+          </div>
+
+          {/* Chaque ligne */}
+          {draft.lignes.map((l, i) => (
+            <div key={i} style={{ background: palette.bg, borderRadius: 10, border: `1px solid ${palette.border}`, padding: "12px 14px", marginBottom: 8 }}>
+              {/* Compte selector */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: palette.textDim, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>Compte</div>
+                <CompteSelector
+                  value={l.compte}
+                  onChange={v => setLigne(i, "compte", v)}
+                  planComptable={planComptable}
+                />
+              </div>
+              {/* Libellé */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: palette.textDim, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>Libellé</div>
+                <input
+                  style={{ ...css.input, fontSize: 12, padding: "8px 11px" }}
+                  value={l.libelle || ""}
+                  onChange={e => setLigne(i, "libelle", e.target.value)}
+                  placeholder="Libellé de la ligne..."
+                />
+              </div>
+              {/* Débit / Crédit */}
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: palette.blue, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>Débit</div>
+                  <input
+                    type="number" step="0.01" min="0"
+                    style={{ ...css.input, fontSize: 13, padding: "8px 11px", fontFamily: mono, color: palette.blue }}
+                    value={l.debit || ""}
+                    onChange={e => setLigne(i, "debit", e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: palette.accent, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>Crédit</div>
+                  <input
+                    type="number" step="0.01" min="0"
+                    style={{ ...css.input, fontSize: 13, padding: "8px 11px", fontFamily: mono, color: palette.accent }}
+                    value={l.credit || ""}
+                    onChange={e => setLigne(i, "credit", e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+                <button
+                  onClick={() => delLigne(i)}
+                  style={{ padding: "8px 10px", borderRadius: 8, border: "none", background: palette.dangerDim, color: palette.danger, cursor: "pointer", flexShrink: 0 }}
+                >
+                  {Icons.trash}
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {/* Ajouter une ligne */}
+          <button
+            onClick={addLigne}
+            style={{ ...css.btn("ghost"), borderStyle: "dashed", marginTop: 4 }}
+          >
+            {Icons.plus} Ajouter une ligne
+          </button>
+        </div>
+
+        {/* ── Footer ── */}
+        <div style={{ padding: "12px 20px", borderTop: `1px solid ${palette.border}`, display: "flex", gap: 8, flexShrink: 0 }}>
+          <button onClick={onClose} style={{ ...css.btn("ghost"), flex: 1, padding: "10px" }}>Annuler</button>
+          <button onClick={handleSave} style={{ ...css.btn("primary"), flex: 2, padding: "10px" }}>
+            {Icons.check} Enregistrer
+          </button>
+        </div>
       </div>
     </div>
   );
+}
+
+// ─── ECRITURES VIEW ───
+function EcrituresView({ ecritures, planComptable, entityType, onDelete, onUpdate }) {
+  const [editingId, setEditingId] = useState(null);
+  const editing = ecritures.find(e => e.id === editingId);
+  const exportOne = (e) => downloadCSV(generateCSV([e]), `ecriture_${e.piece}.csv`);
+  const exportAll = () => {
+    if (!ecritures.length) return;
+    downloadCSV(generateCSV(ecritures), `ecritures_${entityType}_${new Date().toISOString().split("T")[0]}.csv`);
+  };
+  const totalDebit = ecritures.reduce((s, e) => s + e.lignes.reduce((a, l) => a + (l.debit || 0), 0), 0);
+  const totalCredit = ecritures.reduce((s, e) => s + e.lignes.reduce((a, l) => a + (l.credit || 0), 0), 0);
 
   return (
-    <div style={{ padding:"18px" }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
-        <div style={{ fontSize:11, fontWeight:700, color:p.textMuted, textTransform:"uppercase", letterSpacing:1.2 }}>Écritures</div>
-        <button style={s.btnSm("accent")} onClick={()=>downloadCSV(generateCSV(ecritures),`ecritures_${new Date().toISOString().split("T")[0]}.csv`)}>{Icon.dl} Exporter</button>
+    <div style={css.section}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <div style={css.sectionTitle}>Écritures comptables</div>
+        {ecritures.length > 0 && <button style={css.btnSmall("accent")} onClick={exportAll}>{Icons.download} Tout exporter</button>}
       </div>
 
-      <div style={{ display:"flex", gap:8, marginBottom:16 }}>
-        {[{label:"Écritures",value:ecritures.length,color:p.accent},{label:"Total TTC",value:totalTTC.toFixed(2)+" €",color:p.text}].map((st,i)=>(
-          <div key={i} style={{ ...s.card, flex:1, marginBottom:0, padding:12 }}>
-            <div style={{ fontSize:9, color:p.textDim, textTransform:"uppercase", letterSpacing:1 }}>{st.label}</div>
-            <div style={{ fontFamily:mono, fontSize:18, fontWeight:700, color:st.color, marginTop:3 }}>{st.value}</div>
-          </div>
-        ))}
-      </div>
+      {ecritures.length > 0 && (
+        <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+          {[
+            { label: "Écritures", value: ecritures.length, color: palette.accent },
+            { label: "Total TTC", value: totalCredit.toFixed(2) + "€", color: palette.text },
+            { label: "Équilibre", value: Math.abs(totalDebit - totalCredit) < 0.01 ? "✓ OK" : `${(totalDebit - totalCredit).toFixed(2)}€`, color: Math.abs(totalDebit - totalCredit) < 0.01 ? palette.accent : palette.danger },
+          ].map((s, i) => (
+            <div key={i} style={{ ...css.card, flex: 1, minWidth: 100, marginBottom: 0, padding: 14 }}>
+              <div style={{ fontSize: 10, color: palette.textDim, textTransform: "uppercase", letterSpacing: 1 }}>{s.label}</div>
+              <div style={{ fontFamily: mono, fontSize: 20, fontWeight: 700, color: s.color, marginTop: 4 }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
-      {ecritures.map(e => {
-        const {ok} = checkBalance(e.lignes);
-        return (
-          <div key={e.id} style={s.card}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontWeight:700, fontSize:14, color:p.white, marginBottom:3 }}>{e.fournisseur}</div>
-                <div style={{ fontSize:11, color:p.textMuted }}>{e.date} · {e.piece} · <span style={s.badge(p.accent)}>{e.journal}</span></div>
+      {ecritures.length === 0 ? (
+        <div style={css.emptyState}>
+          <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.4 }}>{entityType === "association" ? "🤝" : "📒"}</div>
+          <div>Aucune écriture pour le moment</div>
+          <div style={{ fontSize: 12, marginTop: 6, color: palette.textDim }}>Ajoutez des photos de factures pour générer des écritures</div>
+        </div>
+      ) : (
+        ecritures.map((e) => (
+          <div key={e.id} style={css.card}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{e.fournisseur}</div>
+                <div style={{ fontSize: 12, color: palette.textMuted }}>{e.date} • {e.piece}</div>
               </div>
-              <div style={{ textAlign:"right", flexShrink:0, marginLeft:10 }}>
-                <div style={{ fontFamily:mono, fontWeight:700, fontSize:16, color:p.accent }}>{e.montantTTC.toFixed(2)} €</div>
-                {e.entityType==="association" && <span style={s.badge(p.purple)}>ASSO</span>}
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontFamily: mono, fontWeight: 700, fontSize: 16, color: palette.accent }}>{e.montantTTC.toFixed(2)} €</div>
+                <div style={{ display: "flex", gap: 4, justifyContent: "flex-end", marginTop: 4, flexWrap: "wrap" }}>
+                  <span style={css.badge(palette.accent)}>{e.journal}</span>
+                  {e.entityType === "association" && <span style={css.badge(palette.purple)}>ASSO</span>}
+                  {e.fecMatch && <span style={css.badge(palette.orange)}>FEC ✓</span>}
+                  {!e.fecMatch && <span style={{ ...css.badge(palette.blue), border: `1px dashed ${palette.blue}` }}>✦ Nouveau</span>}
+                </div>
               </div>
             </div>
 
-            <div style={{ fontSize:11, borderRadius:7, padding:"4px 10px", marginBottom:10, color:ok?p.accent:p.warn, background:ok?p.accentDim:p.warnDim }}>
-              {ok ? "✓ Équilibrée" : "⚠ Déséquilibre détecté — cliquez pour corriger"}
+            {e.fecMatch && (
+              <div style={{ fontSize: 11, color: palette.orange, background: palette.orangeDim, borderRadius: 8, padding: "4px 10px", marginBottom: 8 }}>
+                🔁 Compte réutilisé depuis le FEC — fournisseur connu ({e.fecMatchNom})
+              </div>
+            )}
+
+            {!e.equilibre && (
+              <div style={{ fontSize: 11, color: palette.warn, background: palette.warnDim, borderRadius: 8, padding: "4px 10px", marginBottom: 8 }}>
+                ⚠️ Écart détecté ({e.ecartAvantCorrection > 0 ? "+" : ""}{e.ecartAvantCorrection?.toFixed(2)}€) — corrigé automatiquement sur le compte de charge
+              </div>
+            )}
+            {e.equilibre && (
+              <div style={{ fontSize: 11, color: palette.accent, background: palette.accentDim, borderRadius: 8, padding: "4px 10px", marginBottom: 8 }}>
+                ✓ Écriture équilibrée
+              </div>
+            )}
+
+            <div style={{ overflowX: "auto", margin: "10px -4px" }}>
+              <table style={css.table}>
+                <thead>
+                  <tr>
+                    <th style={css.th}>Compte</th>
+                    <th style={css.th}>Libellé</th>
+                    <th style={{ ...css.th, textAlign: "right" }}>Débit</th>
+                    <th style={{ ...css.th, textAlign: "right" }}>Crédit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {e.lignes.map((l, i) => (
+                    <tr key={i}>
+                      <td style={css.td}><span style={css.tag}>{l.compte}</span></td>
+                      <td style={{ ...css.td, fontFamily: font, fontSize: 12, color: palette.textMuted, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.libelle}</td>
+                      <td style={{ ...css.td, textAlign: "right", color: l.debit ? palette.text : palette.textDim }}>{l.debit ? l.debit.toFixed(2) : "-"}</td>
+                      <td style={{ ...css.td, textAlign: "right", color: l.credit ? palette.accent : palette.textDim }}>{l.credit ? l.credit.toFixed(2) : "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
-            {/* Lignes cliquables → ouvre le modal de l'écriture */}
-            <div style={{ marginBottom:10 }}>
-              {e.lignes.map((l,i) => {
-                const deb=parseFloat(l.debit)||0, cred=parseFloat(l.credit)||0;
-                const side=deb>0?"D":"C", montant=deb>0?deb:cred;
-                const lineColor=side==="C"?p.accent:p.blue;
-                return (
-                  <div key={i} onClick={()=>setEditingId(e.id)}
-                    style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 10px", borderRadius:8, marginBottom:3, cursor:"pointer", transition:"background 0.12s" }}
-                    onMouseOver={ev=>ev.currentTarget.style.background=p.accentDim}
-                    onMouseOut={ev=>ev.currentTarget.style.background="transparent"}>
-                    <span style={{ ...s.tag, flexShrink:0 }}>{l.compte||"???"}</span>
-                    <span style={{ flex:1, fontSize:11, color:p.textMuted, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{l.libelle}</span>
-                    <span style={{ fontFamily:mono, fontSize:11, fontWeight:700, color:lineColor, flexShrink:0 }}>{side} {montant.toFixed(2)}</span>
-                    <span style={{ color:p.textDim, opacity:0.6 }}>{Icon.edit}</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div style={{ display:"flex", gap:6 }}>
-              <button style={{ ...s.btnSm("blue"), flex:2 }} onClick={()=>setEditingId(e.id)}>{Icon.edit} Modifier</button>
-              <button style={s.btnSm()} onClick={()=>downloadCSV(generateCSV([e]),`ecriture_${e.piece}.csv`)}>{Icon.dl}</button>
-              <button style={{ ...s.btnSm("ghost"),color:p.danger }} onClick={()=>onDelete(e.id)}>{Icon.trash}</button>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button
+                style={{ ...css.btnSmall("ghost"), color: palette.blue, borderColor: `${palette.blue}44` }}
+                onClick={() => setEditingId(e.id)}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Modifier
+              </button>
+              <button style={css.btnSmall("ghost")} onClick={() => exportOne(e)}>{Icons.download} CSV</button>
+              <button style={{ ...css.btnSmall("ghost"), color: palette.danger, borderColor: "rgba(248,113,113,0.3)" }} onClick={() => onDelete(e.id)}>{Icons.trash} Supprimer</button>
             </div>
           </div>
-        );
-      })}
+        ))
+      )}
 
       {editing && (
         <EcritureModal
           ecriture={editing}
           planComptable={planComptable}
-          onAddCompte={onAddCompte}
-          onSave={u=>{onUpdate(u);setEditingId(null);}}
-          onClose={()=>setEditingId(null)}
+          onSave={u => { onUpdate(u); setEditingId(null); }}
+          onClose={() => setEditingId(null)}
         />
       )}
     </div>
@@ -2010,7 +1979,7 @@ function PlanComptableView({ planComptable, setPlanComptable, entityType }) {
 }
 
 // ─── APP ───
-export default function ComptaScan({ user, userProfile, onHome }) {
+export default function ComptaScan({ user, onHome }) {
   const [entityType, setEntityType] = useState("entreprise");
   const [tab, setTab] = useState("scan");
   const [ecritures, setEcritures] = useState([]);
@@ -2034,11 +2003,6 @@ export default function ComptaScan({ user, userProfile, onHome }) {
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
-  };
-
-  const handleAddCompte = (c) => {
-    setPlanComptable((prev) => prev.find((x) => x.compte === c.compte) ? prev : [...prev, c].sort((a, b) => a.compte.localeCompare(b.compte)));
-    showToast(`Compte ${c.compte} ajouté ✓`);
   };
 
   const navItems = [
@@ -2088,32 +2052,6 @@ export default function ComptaScan({ user, userProfile, onHome }) {
 
         {/* Actions droite */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-
-          {/* ── Barre de tokens ── */}
-          {userProfile && (
-            <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: 20, background: palette.surface, border: `1px solid ${palette.border}` }}>
-              {userProfile.tokensRemaining === -1 ? (
-                <span style={{ fontSize: 10, color: palette.accent, fontFamily: mono, fontWeight: 700 }}>∞</span>
-              ) : (
-                <>
-                  <div style={{ width: 30, height: 3, borderRadius: 2, background: palette.border, overflow: "hidden" }}>
-                    <div style={{
-                      height: "100%", borderRadius: 2,
-                      background: userProfile.tokensRemaining === 0 ? palette.danger
-                        : userProfile.tokensRemaining <= Math.ceil((userProfile.tokensTotal || 10) * 0.2) ? palette.warn
-                        : palette.accent,
-                      width: `${Math.min(100, Math.round((userProfile.tokensRemaining / (userProfile.tokensTotal || 10)) * 100))}%`,
-                      transition: "width 0.4s"
-                    }} />
-                  </div>
-                  <span style={{ fontSize: 10, fontFamily: mono, fontWeight: 600, color: userProfile.tokensRemaining === 0 ? palette.danger : palette.textMuted }}>
-                    {userProfile.tokensRemaining}<span style={{ color: palette.textDim }}>/{userProfile.tokensTotal}</span>
-                  </span>
-                </>
-              )}
-            </div>
-          )}
-
           {fecData.length > 0 && (
             <div style={{ fontSize: 10, color: palette.orange, background: palette.orangeDim, padding: "3px 8px", borderRadius: 20, fontWeight: 700, letterSpacing: 0.3 }}>
               FEC
@@ -2148,14 +2086,6 @@ export default function ComptaScan({ user, userProfile, onHome }) {
         </div>
       </div>
 
-      {/* ── Alerte tokens épuisés ── */}
-      {userProfile && userProfile.tokensRemaining === 0 && userProfile.tokensRemaining !== -1 && (
-        <div style={{ margin: "10px 20px 0", padding: "10px 14px", borderRadius: 10, background: palette.dangerDim, border: `1px solid ${palette.danger}44`, fontSize: 12, color: palette.danger, lineHeight: 1.5 }}>
-          <strong>Tokens épuisés</strong> — Quota mensuel atteint.{" "}
-          <a href="tarifs.html" style={{ color: palette.danger, fontWeight: 700, textDecoration: "underline" }}>Passer au plan supérieur →</a>
-        </div>
-      )}
-
       <div style={css.entityToggle}>
         <button style={css.entityBtn(entityType === "entreprise", "entreprise")} onClick={() => switchEntity("entreprise")}>🏢 Entreprise</button>
         <button style={css.entityBtn(entityType === "association", "association")} onClick={() => switchEntity("association")}>🤝 Association</button>
@@ -2168,8 +2098,8 @@ export default function ComptaScan({ user, userProfile, onHome }) {
       </div>
 
       <div style={{ animation: "fadeIn 0.3s ease" }} key={`${tab}-${entityType}`}>
-        {tab === "scan" && <ScanView planComptable={planComptable} entityType={entityType} onEcrituresGenerated={handleNewEcritures} fecData={fecData} noTokens={userProfile && userProfile.tokensRemaining === 0 && userProfile.tokensRemaining !== -1} />}
-        {tab === "ecritures" && <EcrituresView ecritures={ecritures} planComptable={planComptable} onAddCompte={handleAddCompte} onDelete={(id) => { setEcritures((p) => p.filter((e) => e.id !== id)); showToast("Écriture supprimée"); }} onUpdate={(u) => { setEcritures((p) => p.map((e) => e.id === u.id ? u : e)); showToast("Écriture modifiée ✓"); }} />}
+        {tab === "scan" && <ScanView planComptable={planComptable} entityType={entityType} onEcrituresGenerated={handleNewEcritures} fecData={fecData} />}
+        {tab === "ecritures" && <EcrituresView ecritures={ecritures} planComptable={planComptable} entityType={entityType} onDelete={(id) => { setEcritures((p) => p.filter((e) => e.id !== id)); showToast("Écriture supprimée"); }} onUpdate={(u) => { setEcritures((p) => p.map((e) => e.id === u.id ? u : e)); showToast("Écriture modifiée ✓"); }} />}
         {tab === "fec" && <FecView fecData={fecData} setFecData={setFecData} />}
         {tab === "plan" && <PlanComptableView planComptable={planComptable} setPlanComptable={setPlanComptable} entityType={entityType} />}
       </div>
