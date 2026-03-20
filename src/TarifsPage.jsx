@@ -21,8 +21,7 @@ const PLANS = [
       "Tous les territoires (Métropole + DOM)",
       "Export CSV",
       "ComptaScan — scan de factures IA",
-      "DeFactor — 5 factures électroniques / mois",
-    ],
+          ],
     ctaLabel: "Créer mon compte →",
     ctaStyle: "green",
     pop: false,
@@ -40,8 +39,7 @@ const PLANS = [
       "Historique des analyses",
       "Support email",
       "ComptaScan — scan de factures IA",
-      "DeFactor — 30 factures électroniques / mois",
-    ],
+          ],
     ctaLabel: "Choisir Starter →",
     ctaStyle: "ghost",
     pop: false,
@@ -60,8 +58,7 @@ const PLANS = [
       "Rapport de gestion IA",
       "Support prioritaire",
       "ComptaScan — scan de factures IA",
-      "DeFactor — 100 factures électroniques / mois",
-    ],
+          ],
     ctaLabel: "Choisir Pro →",
     ctaStyle: "primary",
     pop: true,
@@ -82,8 +79,7 @@ const PLANS = [
       "Accès anticipé nouvelles fonctionnalités",
       "Support dédié",
       "ComptaScan — scan illimité de factures",
-      "DeFactor — factures électroniques illimitées",
-    ],
+          ],
     ctaLabel: "Choisir Expert →",
     ctaStyle: "ghost",
     pop: false,
@@ -110,10 +106,6 @@ const FAQS = [
   {
     q: "Comment fonctionne l'essai gratuit ?",
     a: "Créez votre compte gratuitement — aucune carte bancaire n'est demandée. Vous recevez 10 tokens pour tester tous les outils. Une fois les tokens épuisés, choisissez un plan payant pour continuer.",
-  },
-  {
-    q: "Qu'est-ce que DeFactor et comment fonctionne la limite de factures ?",
-    a: "DeFactor génère des factures électroniques conformes Factur-X EN 16931 et les dépose sur votre PDP (Chorus Pro…). Contrairement aux analyses IA, les factures ont un quota mensuel propre : 5 sur l'Essai, 30 sur Starter, 100 sur Pro, illimitées sur Expert.",
   },
   {
     q: "Puis-je annuler à tout moment ?",
@@ -330,7 +322,7 @@ export default function TarifsPage({ onHome, onLogin, user }) {
           Compta<em style={{ fontStyle: "italic", fontWeight: 300, color: "#6EE7B7" }}>Scan</em> — Tarifs
         </h1>
         <p style={{ fontSize: 16, color: palette.textMuted, lineHeight: 1.7, maxWidth: 520, margin: "0 auto 12px" }}>
-          ComptaScan et DeFactor sont inclus dans votre abonnement Finaïa. Scan de factures + facturation électronique Factur-X — même compte, mêmes tokens.
+          ComptaScan est inclus dans votre abonnement Finaïa. Scan de factures IA — même compte, mêmes tokens.
         </p>
         <p style={{ fontFamily: mono, fontSize: 13, color: palette.textDim }}>
           1 token = 1 analyse IA · Essai gratuit · Sans engagement · Annulable à tout moment
